@@ -331,3 +331,128 @@ draw = function() {
   ctx.fillRect(pad, pad, w * ratio, h);
   ctx.restore();
 };
+/* =========================
+   XP & LEVEL SYSTEM
+========================= */
+
+// Oyuncu seviye verileri
+player.level = 1;
+player.xp = 0;
+player.xpToNext = 100;
+
+// Aura (geçici otomatik hasar)
+player.auraRadius = 34;
+player.auraDps = 30; // saniyede hasar
+
+// Düşmanlara can ekle (mevcut olanlara da uygula)
+function initEnemyHealth(e) {
+  if (e.maxHealth == null) {
+    e.maxHealth = e.type === ENEMY_TYPES.MELEE ? 40 : 30;
+    e.health = e.maxHealth;
+  }
+}
+
+// Level atlama
+function levelUp() {
+  player.level++;
+  player.xp = 0;
+  player.xpToNext = Math.floor(player.xpToNext * 1.35);
+
+  // küçük güçlenme
+  player.speed += 20;
+  player.maxHealth += 10;
+  player.health = player.maxHealth;
+
+  // aura biraz büyür
+  player.auraRadius += 3;
+  player.auraDps += 5;
+
+  // görsel minik patlama
+  screenShake.time = 0.25;
+}
+
+// Screen shake altyapısı (hafif)
+const screenShake = { time: 0, strength: 6 };
+
+// Update’e entegre
+const _update3 = update;
+update = function(dt) {
+  _update3(dt);
+
+  // Screen shake süresi
+  if (screenShake.time > 0) screenShake.time -= dt;
+
+  // Düşmanlara aura hasarı
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    initEnemyHealth(e);
+
+    const dx = player.x - e.x;
+    const dy = player.y - e.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < player.auraRadius) {
+      e.health -= player.auraDps * dt;
+
+      if (e.health <= 0) {
+        // XP kazan
+        player.xp += e.type === ENEMY_TYPES.MELEE ? 20 : 15;
+        enemies.splice(i, 1);
+
+        // küçük sarsıntı
+        screenShake.time = 0.12;
+
+        if (player.xp >= player.xpToNext) {
+          levelUp();
+        }
+      }
+    }
+  }
+};
+
+// Draw’e XP HUD + aura görseli
+const _draw3 = draw;
+draw = function() {
+  // screen shake uygula
+  let sx = 0, sy = 0;
+  if (screenShake.time > 0) {
+    sx = (Math.random() - 0.5) * screenShake.strength;
+    sy = (Math.random() - 0.5) * screenShake.strength;
+  }
+  ctx.save();
+  ctx.translate(sx, sy);
+  _draw3();
+  ctx.restore();
+
+  // Aura görseli
+  ctx.save();
+  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.globalAlpha = 0.15;
+  ctx.strokeStyle = "#00ffff";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, player.auraRadius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // XP bar
+  const pad = 16;
+  const w = 220, h = 10;
+  const ratio = Math.min(1, player.xp / player.xpToNext);
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(pad, pad + 22, w, h);
+
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = "#6cf";
+  ctx.fillStyle = "#6cf";
+  ctx.fillRect(pad, pad + 22, w * ratio, h);
+
+  // Level yazısı
+  ctx.fillStyle = "#eaf2ff";
+  ctx.font = "12px system-ui";
+  ctx.fillText("LV " + player.level, pad + w + 10, pad + 32);
+  ctx.restore();
+};
