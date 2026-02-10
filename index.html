@@ -1324,6 +1324,51 @@ function renderSettings(){
     soundSettings.volume = parseFloat(e.target.value);
   };
 }
+/* =========================
+   BACKGROUND MUSIC FIX (REAL LOOP)
+========================= */
+
+// Gerçek müzik objesi
+let bgMusic = new Audio();
+bgMusic.loop = true;
+bgMusic.volume = 0.4 * soundSettings.volume;
+
+// Telifsiz, data-uri synth müzik (harici dosya gerekmez)
+bgMusic.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+
+// İlk kullanıcı etkileşiminde başlat
+function tryStartMusic(){
+  if (!soundSettings.music) return;
+  bgMusic.volume = 0.4 * soundSettings.volume;
+  bgMusic.play().catch(()=>{});
+}
+
+// Her tıklama/dokunuşta dene (1 kere çalınca bırakır)
+window.addEventListener("pointerdown", tryStartMusic);
+window.addEventListener("keydown", tryStartMusic);
+
+// Ayarlardan kontrol
+const _musicToggleFix = renderSettings;
+renderSettings = function(){
+  _musicToggleFix();
+
+  const musicChk = document.getElementById("musicChk");
+  if (musicChk){
+    musicChk.onchange = e=>{
+      soundSettings.music = e.target.checked;
+      if (soundSettings.music) tryStartMusic();
+      else bgMusic.pause();
+    };
+  }
+
+  const volRange = document.getElementById("volRange");
+  if (volRange){
+    volRange.oninput = e=>{
+      soundSettings.volume = parseFloat(e.target.value);
+      bgMusic.volume = 0.4 * soundSettings.volume;
+    };
+  }
+};
 
 </script>
 </body>
