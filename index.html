@@ -456,3 +456,31 @@ draw = function() {
   ctx.fillText("LV " + player.level, pad + w + 10, pad + 32);
   ctx.restore();
 };
+/* =========================
+   DRAW PIPELINE FIX
+   (BLACK SCREEN HOTFIX)
+========================= */
+
+// Draw zincirini güvenli hale al
+let __safeDraw = draw;
+
+draw = function () {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // screen shake varsa uygula
+  let sx = 0, sy = 0;
+  if (typeof screenShake !== "undefined" && screenShake.time > 0) {
+    sx = (Math.random() - 0.5) * screenShake.strength;
+    sy = (Math.random() - 0.5) * screenShake.strength;
+  }
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  __safeDraw();
+  ctx.restore();
+};
+
+</script>
+</body>
+</html>
