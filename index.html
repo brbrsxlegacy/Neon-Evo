@@ -646,6 +646,86 @@ draw = function(){
 
   ctx.restore();
 };
+/* =========================
+   VISUAL EFFECTS & POLISH
+========================= */
+
+// ---- PARTICLES ----
+const particles = [];
+
+function spawnParticles(x, y, color="#00ffff", count=10){
+  for (let i=0;i<count;i++){
+    particles.push({
+      x, y,
+      vx: (Math.random()-0.5)*260,
+      vy: (Math.random()-0.5)*260,
+      life: 0.4 + Math.random()*0.3,
+      r: 2 + Math.random()*2,
+      color
+    });
+  }
+}
+
+// ---- HIT FLASH ----
+function hitFlash(e){
+  e._flash = 0.1;
+}
+
+// ---- UPDATE ENTEGRASYONU ----
+const _update5 = update;
+update = function(dt){
+  _update5(dt);
+
+  // Particle update
+  for (let i = particles.length-1; i>=0; i--){
+    const p = particles[i];
+    p.life -= dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= 0.96;
+    p.vy *= 0.96;
+    if (p.life <= 0) particles.splice(i,1);
+  }
+
+  // Enemy flash timer
+  enemies.forEach(e=>{
+    if (e._flash > 0) e._flash -= dt;
+  });
+};
+
+// ---- DÜŞMAN ÖLÜMÜNE PARTİKÜL BAĞLA ----
+const _killXP = levelUp;
+levelUp = function(){
+  spawnParticles(player.x, player.y, "#6cf", 18);
+  _killXP();
+};
+
+// Mermi ve melee vuruşlarında efekt
+const _shootBulletFx = shootBullet;
+shootBullet = function(){
+  _shootBulletFx();
+  spawnParticles(player.x, player.y, "#6cf", 6);
+};
+
+// ---- DRAW ENTEGRASYONU ----
+const _draw5 = draw;
+draw = function(){
+  _draw5();
+
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+  // Particles
+  particles.forEach(p=>{
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+};
 
 </script>
 </body>
