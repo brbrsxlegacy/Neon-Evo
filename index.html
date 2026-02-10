@@ -1046,6 +1046,49 @@ shopBtn.onclick = () => {
   shopPanel.style.display = shopPanel.style.display === "none" ? "grid" : "none";
   renderShopAdvanced();
 };
+/* =========================
+   SHOP CLOSE (X BUTTON)
+========================= */
+
+// X butonu oluştur (tek sefer)
+const shopCloseBtn = document.createElement("div");
+shopCloseBtn.textContent = "✕";
+shopCloseBtn.style.cssText = `
+  position:fixed;
+  top:14px; right:14px;
+  width:32px; height:32px;
+  display:flex; align-items:center; justify-content:center;
+  background:#000;
+  color:#fff;
+  border:1px solid #0ff;
+  border-radius:6px;
+  cursor:pointer;
+  z-index:9999;
+  box-shadow:0 0 10px #0ff;
+`;
+shopCloseBtn.style.display = "none";
+document.body.appendChild(shopCloseBtn);
+
+// X tıklanınca marketi kapat
+shopCloseBtn.onclick = () => {
+  shopPanel.style.display = "none";
+  shopCloseBtn.style.display = "none";
+};
+
+// Market açıldığında X'i göster
+const _shopBtnClick = shopBtn.onclick;
+shopBtn.onclick = () => {
+  _shopBtnClick();
+  const open = shopPanel.style.display !== "none";
+  shopCloseBtn.style.display = open ? "flex" : "none";
+};
+
+// Admin/Creator paneli açılırsa X gizle (karışmasın)
+const _adminBtnClick = adminBtn.onclick;
+adminBtn.onclick = () => {
+  _adminBtnClick();
+  shopCloseBtn.style.display = "none";
+};
 
 </script>
 </body>
