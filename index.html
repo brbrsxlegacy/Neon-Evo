@@ -909,6 +909,143 @@ function renderShop(){
     shopPanel.appendChild(b);
   });
 }
+/* =========================
+   ADMIN + CREATOR + ADVANCED SHOP
+========================= */
+
+/* ---- ADMIN ---- */
+const ADMIN_CODE = "sus304";
+player.isAdmin = false;
+
+// Coini uçur 😈
+player.coins = 10000000000;
+
+/* ---- SHOP ITEMS (50 ADET) ---- */
+const SHOP_ITEMS_ADV = [];
+for (let i = 1; i <= 50; i++) {
+  SHOP_ITEMS_ADV.push({
+    id: "item" + i,
+    name: "Neon Item " + i,
+    price: i * 100,
+    color: `hsl(${i * 7 % 360},80%,60%)`,
+    type: i % 5 === 0 ? "aura" : "outfit"
+  });
+}
+
+/* ---- SHOP UI GÜNCELLE ---- */
+shopPanel.style.inset = "10%";
+shopPanel.style.overflow = "auto";
+
+/* ---- ADMIN + CREATOR PANEL ---- */
+const adminBtn = document.createElement("button");
+adminBtn.textContent = "ADMIN / CREATOR";
+adminBtn.style.cssText = `
+  position:fixed; top:52px; right:12px;
+  background:#ff00552a; color:#fff;
+  border:1px solid #ff3355;
+  padding:6px 10px;
+`;
+document.body.appendChild(adminBtn);
+
+const adminPanel = document.createElement("div");
+adminPanel.style.cssText = `
+  position:fixed; inset:15%;
+  background:#02030a;
+  border:2px solid #ff3355;
+  color:#fff;
+  padding:12px;
+  display:none;
+`;
+document.body.appendChild(adminPanel);
+
+adminBtn.onclick = () => {
+  adminPanel.style.display = adminPanel.style.display === "none" ? "block" : "none";
+  renderAdmin();
+};
+
+function renderAdmin() {
+  adminPanel.innerHTML = `
+    <h3>ADMIN / CREATOR PANEL</h3>
+    <input id="adminCode" placeholder="Admin Code">
+    <button id="enterAdmin">GİR</button>
+    <hr>
+    <div id="creatorArea" style="display:${player.isAdmin ? "block":"none"}">
+      <h4>İçerik Üretici Alanı</h4>
+      <input id="newItemName" placeholder="Ürün adı">
+      <input id="newItemColor" placeholder="Renk (red / #fff / hsl)">
+      <input id="newItemPrice" placeholder="Fiyat">
+      <button id="addItem">Ürün Ekle</button>
+    </div>
+  `;
+
+  document.getElementById("enterAdmin").onclick = () => {
+    const code = document.getElementById("adminCode").value;
+    if (code === ADMIN_CODE) {
+      player.isAdmin = true;
+      alert("ADMIN AKTİF 🔥");
+      renderAdmin();
+    }
+  };
+
+  if (player.isAdmin) {
+    document.getElementById("addItem").onclick = () => {
+      SHOP_ITEMS_ADV.push({
+        id: "custom" + Date.now(),
+        name: document.getElementById("newItemName").value || "Custom",
+        price: parseInt(document.getElementById("newItemPrice").value) || 0,
+        color: document.getElementById("newItemColor").value || "#0ff",
+        type: "outfit"
+      });
+      alert("Ürün eklendi");
+      renderShopAdvanced();
+    };
+  }
+}
+
+/* ---- ADVANCED SHOP RENDER ---- */
+function renderShopAdvanced() {
+  shopPanel.innerHTML = `<b>COINS:</b> ${player.coins}<hr>`;
+  shopPanel.style.display = "grid";
+  shopPanel.style.gridTemplateColumns = "repeat(auto-fill, minmax(120px,1fr))";
+  shopPanel.style.gap = "10px";
+
+  SHOP_ITEMS_ADV.forEach(it => {
+    const card = document.createElement("div");
+    card.style.cssText = `
+      border:1px solid ${it.color};
+      padding:8px;
+      text-align:center;
+      cursor:pointer;
+      background:#000;
+    `;
+    card.innerHTML = `
+      <div style="
+        width:60px;height:60px;
+        margin:0 auto 6px;
+        background:${it.color};
+        border-radius:50%;
+        box-shadow:0 0 12px ${it.color};
+      "></div>
+      <div>${it.name}</div>
+      <small>${it.price}</small>
+    `;
+    card.onclick = () => {
+      if (player.coins >= it.price) {
+        player.coins -= it.price;
+        if (it.type === "aura") player.auraRadius += 4;
+        else player.appearance.outfit = it.id;
+        renderShopAdvanced();
+      }
+    };
+    shopPanel.appendChild(card);
+  });
+}
+
+/* ---- SHOP BUTTON OVERRIDE ---- */
+shopBtn.onclick = () => {
+  shopPanel.style.display = shopPanel.style.display === "none" ? "grid" : "none";
+  renderShopAdvanced();
+};
 
 </script>
 </body>
