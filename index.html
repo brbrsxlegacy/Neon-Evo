@@ -1089,6 +1089,241 @@ adminBtn.onclick = () => {
   _adminBtnClick();
   shopCloseBtn.style.display = "none";
 };
+/* =========================
+   SAVE / LOAD (localStorage)
+========================= */
+
+const SAVE_KEY = "NEON_RISE_SAVE_V1";
+
+// Kaydedilecek veriyi hazırla
+function buildSaveData() {
+  return {
+    player: {
+      x: player.x,
+      y: player.y,
+      level: player.level,
+      xp: player.xp,
+      xpToNext: player.xpToNext,
+      maxHealth: player.maxHealth,
+      health: player.health,
+      speed: player.speed,
+      auraRadius: player.auraRadius,
+      coins: player.coins,
+      appearance: player.appearance,
+      isAdmin: player.isAdmin
+    },
+    shop: {
+      items: SHOP_ITEMS_ADV // admin ekledikleri dahil
+    },
+    time: Date.now()
+  };
+}
+
+// Kaydet
+function saveGame() {
+  try {
+    const data = buildSaveData();
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    toast("Kaydedildi 💾");
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Yükle
+function loadGame() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+
+    Object.assign(player, data.player);
+    if (data.shop && data.shop.items) {
+      SHOP_ITEMS_ADV.length = 0;
+      data.shop.items.forEach(it => SHOP_ITEMS_ADV.push(it));
+    }
+    applyEvolution(); // evrimi yeniden uygula
+    toast("Yüklendi ✅");
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Otomatik yükle
+loadGame();
+
+// Otomatik kaydet (30 sn)
+setInterval(saveGame, 30000);
+
+// Sekme kapanırken kaydet
+window.addEventListener("beforeunload", saveGame);
+
+// ---- Basit Toast Bildirimi ----
+const toastEl = document.createElement("div");
+toastEl.style.cssText = `
+  position:fixed; left:50%; bottom:20px; transform:translateX(-50%);
+  background:#000; color:#0ff; padding:8px 14px;
+  border:1px solid #0ff; border-radius:8px;
+  box-shadow:0 0 12px #0ff; z-index:9999;
+  opacity:0; transition:opacity .2s;
+`;
+document.body.appendChild(toastEl);
+
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.style.opacity = 1;
+  setTimeout(()=>toastEl.style.opacity = 0, 1200);
+}
+
+// ---- Manuel Kaydet/Yükle Butonları ----
+const saveBtn = document.createElement("button");
+saveBtn.textContent = "SAVE";
+saveBtn.style.cssText = `
+  position:fixed; left:12px; bottom:12px;
+  background:#0ff2; color:#eaf2ff;
+  border:1px solid #0ff; padding:6px 10px;
+`;
+document.body.appendChild(saveBtn);
+saveBtn.onclick = saveGame;
+
+const loadBtn = document.createElement("button");
+loadBtn.textContent = "LOAD";
+loadBtn.style.cssText = `
+  position:fixed; left:72px; bottom:12px;
+  background:#0ff2; color:#eaf2ff;
+  border:1px solid #0ff; padding:6px 10px;
+`;
+document.body.appendChild(loadBtn);
+loadBtn.onclick = loadGame;
+/* =========================
+   SOUND & MUSIC SYSTEM
+========================= */
+
+// ---- SES AYARLARI ----
+const soundSettings = {
+  sfx: true,
+  music: true,
+  volume: 0.6
+};
+
+// ---- AUDIO CONTEXT ----
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioCtx();
+
+// Basit beep üretici (dosya gerekmez)
+function playBeep(freq=440, dur=0.08, type="sine", vol=0.5){
+  if (!soundSettings.sfx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.value = vol * soundSettings.volume;
+  o.connect(g).connect(audioCtx.destination);
+  o.start();
+  o.stop(audioCtx.currentTime + dur);
+}
+
+// ---- SFX BAĞLANTILARI ----
+const _meleeSfx = player.melee;
+const _shootSfx = shootBullet;
+shootBullet = function(){
+  playBeep(820, 0.05, "square", 0.4);
+  _shootSfx();
+};
+
+const _levelUpSfx = levelUp;
+levelUp = function(){
+  playBeep(520, 0.12, "sawtooth", 0.6);
+  playBeep(780, 0.14, "sawtooth", 0.6);
+  _levelUpSfx();
+};
+
+// Düşman hasarı için kısa klik
+const _hitFlashSfx = hitFlash;
+hitFlash = function(e){
+  playBeep(220, 0.04, "triangle", 0.3);
+  _hitFlashSfx(e);
+};
+
+// ---- ARKA PLAN MÜZİĞİ (LOOP) ----
+let musicOsc = null;
+
+function startMusic(){
+  if (!soundSettings.music || musicOsc) return;
+  musicOsc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  musicOsc.type = "sine";
+  musicOsc.frequency.value = 110;
+  g.gain.value = 0.08 * soundSettings.volume;
+  musicOsc.connect(g).connect(audioCtx.destination);
+  musicOsc.start();
+}
+
+function stopMusic(){
+  if (musicOsc){
+    musicOsc.stop();
+    musicOsc = null;
+  }
+}
+
+// İlk etkileşimde müziği başlat (tarayıcı kuralı)
+window.addEventListener("pointerdown", startMusic, { once:true });
+
+// ---- AYAR MENÜSÜ ----
+const settingsBtn = document.createElement("button");
+settingsBtn.textContent = "SETTINGS";
+settingsBtn.style.cssText = `
+  position:fixed; top:12px; left:12px;
+  background:#0ff2; color:#eaf2ff;
+  border:1px solid #0ff; padding:6px 10px;
+`;
+document.body.appendChild(settingsBtn);
+
+const settingsPanel = document.createElement("div");
+settingsPanel.style.cssText = `
+  position:fixed; inset:30%;
+  background:#02030a;
+  border:2px solid #0ff;
+  color:#eaf2ff;
+  padding:12px;
+  display:none;
+`;
+document.body.appendChild(settingsPanel);
+
+settingsBtn.onclick = ()=>{
+  settingsPanel.style.display = settingsPanel.style.display==="none"?"block":"none";
+  renderSettings();
+};
+
+function renderSettings(){
+  settingsPanel.innerHTML = `
+    <h3>AYARLAR</h3>
+    <label>
+      <input type="checkbox" id="sfxChk" ${soundSettings.sfx?"checked":""}>
+      Ses Efektleri
+    </label><br><br>
+    <label>
+      <input type="checkbox" id="musicChk" ${soundSettings.music?"checked":""}>
+      Müzik
+    </label><br><br>
+    <label>
+      Ses Seviyesi
+      <input type="range" id="volRange" min="0" max="1" step="0.05" value="${soundSettings.volume}">
+    </label>
+  `;
+
+  document.getElementById("sfxChk").onchange = e=>{
+    soundSettings.sfx = e.target.checked;
+  };
+  document.getElementById("musicChk").onchange = e=>{
+    soundSettings.music = e.target.checked;
+    if (soundSettings.music) startMusic();
+    else stopMusic();
+  };
+  document.getElementById("volRange").oninput = e=>{
+    soundSettings.volume = parseFloat(e.target.value);
+  };
+}
 
 </script>
 </body>
