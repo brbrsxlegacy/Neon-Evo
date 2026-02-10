@@ -726,6 +726,72 @@ draw = function(){
 
   ctx.restore();
 };
+/* =========================
+   CHARACTER EVOLUTION
+========================= */
+
+// Evrim aşamaları
+const EVOLUTIONS = [
+  { lvl: 1,  size: 18, glow: 18, color: "#00ffff", auraMul: 1.0 },
+  { lvl: 4,  size: 20, glow: 22, color: "#6cf",    auraMul: 1.1 },
+  { lvl: 8,  size: 22, glow: 26, color: "#9f6cff", auraMul: 1.2 },
+  { lvl: 12, size: 24, glow: 30, color: "#ff6cf0", auraMul: 1.35 }
+];
+
+player.evoIndex = 0;
+
+// Evrimi uygula
+function applyEvolution() {
+  let idx = 0;
+  for (let i = 0; i < EVOLUTIONS.length; i++) {
+    if (player.level >= EVOLUTIONS[i].lvl) idx = i;
+  }
+  if (idx !== player.evoIndex) {
+    player.evoIndex = idx;
+    const e = EVOLUTIONS[idx];
+
+    player.size = e.size;
+    player._evoColor = e.color;
+    player._evoGlow = e.glow;
+
+    // Aura güçlendirme
+    player.auraRadius = Math.floor(player.auraRadius * e.auraMul);
+
+    // Görsel geri bildirim
+    spawnParticles(player.x, player.y, e.color, 28);
+    screenShake.time = 0.2;
+  }
+}
+
+// LevelUp’a bağla
+const _levelUpEvo = levelUp;
+levelUp = function () {
+  _levelUpEvo();
+  applyEvolution();
+};
+
+// Oyun başında da uygula
+applyEvolution();
+
+// ---- DRAW EVOLUTION ----
+const _draw6 = draw;
+draw = function () {
+  _draw6();
+
+  ctx.save();
+  ctx.translate(canvas.width / 2 - player.x, canvas.height / 2 - player.y);
+
+  // Player glow + core
+  ctx.shadowBlur = player._evoGlow || 18;
+  ctx.shadowColor = player._evoColor || "#00ffff";
+  ctx.fillStyle = player._evoColor || "#00ffff";
+
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+};
 
 </script>
 </body>
