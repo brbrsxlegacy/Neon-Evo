@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>NEON RISE</title>
+
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #05060a;
+  overflow: hidden;
+  touch-action: none;
+  font-family: system-ui, sans-serif;
+}
+
+canvas {
+  display: block;
+  background: radial-gradient(circle at center, #0b1020, #02030a);
+}
+
+/* Mobil joystick */
+#joystick {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(0,255,255,0.08);
+  border: 2px solid rgba(0,255,255,0.4);
+}
+
+#stick {
+  position: absolute;
+  left: 45px;
+  top: 45px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(0,255,255,0.9);
+}
+</style>
+</head>
+
+<body>
+<canvas id="game"></canvas>
+
+<div id="joystick">
+  <div id="stick"></div>
+</div>
+
+<script>
+/* =========================
+   CANVAS & GAME LOOP
+========================= */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+let lastTime = 0;
+function gameLoop(time) {
+  const delta = (time - lastTime) / 1000;
+  lastTime = time;
+  update(delta);
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+/* =========================
+   INPUT SYSTEM
+========================= */
+const keys = {};
+window.addEventListener("keydown", e => keys[e.key] = true);
+window.addEventListener("keyup", e => keys[e.key] = false);
+
+/* Mobil joystick */
+let joyX = 0, joyY = 0;
+const joystick = document.getElementById("joystick");
+const stick = document.getElementById("stick");
+let dragging = false;
+
+joystick.addEventListener("touchstart", e => dragging = true);
+window.addEventListener("touchend", () => {
+  dragging = false;
+  joyX = joyY = 0;
+  stick.style.left = "45px";
+  stick.style.top = "45px";
+});
+
+window.addEventListener("touchmove", e => {
+  if (!dragging) return;
+  const rect = joystick.getBoundingClientRect();
+  const touch = e.touches[0];
+  let x = touch.clientX - rect.left - 70;
+  let y = touch.clientY - rect.top - 70;
+  const dist = Math.hypot(x, y);
+  if (dist > 40) {
+    x = x / dist * 40;
+    y = y / dist * 40;
+  }
+  joyX = x / 40;
+  joyY = y / 40;
+  stick.style.left = 45 + x + "px";
+  stick.style.top = 45 + y + "px";
+});
+
+/* =========================
+   PLAYER
+========================= */
+const player = {
+  x: 0,
+  y: 0,
+  size: 18,
+  speed: 260
+};
+
+function update(dt) {
+  let dx = 0, dy = 0;
+
+  if (keys["w"] || keys["ArrowUp"]) dy -= 1;
+  if (keys["s"] || keys["ArrowDown"]) dy += 1;
+  if (keys["a"] || keys["ArrowLeft"]) dx -= 1;
+  if (keys["d"] || keys["ArrowRight"]) dx += 1;
+
+  dx += joyX;
+  dy += joyY;
+
+  const len = Math.hypot(dx, dy);
+  if (len > 0) {
+    dx /= len;
+    dy /= len;
+  }
+
+  player.x += dx * player.speed * dt;
+  player.y += dy * player.speed * dt;
+}
+
+/* =========================
+   DRAW
+========================= */
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+  // Grid
+  ctx.strokeStyle = "rgba(0,255,255,0.05)";
+  for (let x=-2000; x<2000; x+=60) {
+    ctx.beginPath();
+    ctx.moveTo(x, -2000);
+    ctx.lineTo(x, 2000);
+    ctx.stroke();
+  }
+  for (let y=-2000; y<2000; y+=60) {
+    ctx.beginPath();
+    ctx.moveTo(-2000, y);
+    ctx.lineTo(2000, y);
+    ctx.stroke();
+  }
+
+  // Player glow
+  ctx.shadowBlur = 25;
+  ctx.shadowColor = "#00ffff";
+  ctx.fillStyle = "#00ffff";
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.size, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
