@@ -792,6 +792,123 @@ draw = function () {
 
   ctx.restore();
 };
+/* =========================
+   EVOLUTION 0–100 + COSMETICS + SHOP
+========================= */
+
+/* ---- EVOLUTION DATA (0–100) ---- */
+player.appearance = {
+  color: "#00ffff",
+  glow: 18,
+  outfit: "none"
+};
+
+function getEvolutionByLevel(lv){
+  return {
+    size: 18 + Math.floor(lv / 5),              // her 5 level büyür
+    glow: 18 + Math.floor(lv / 4),
+    color: `hsl(${(lv*3)%360}, 80%, 60%)`        // levela göre renk
+  };
+}
+
+/* ---- OVERRIDE DRAW (PLAYER TEK NOKTA) ---- */
+const _drawFinal = draw;
+draw = function(){
+  _drawFinal();
+
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+  const evo = getEvolutionByLevel(player.level);
+
+  // Aura
+  ctx.globalAlpha = 0.15;
+  ctx.strokeStyle = evo.color;
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.auraRadius, 0, Math.PI*2);
+  ctx.stroke();
+
+  // Player
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = evo.glow;
+  ctx.shadowColor = evo.color;
+  ctx.fillStyle = evo.color;
+
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, evo.size, 0, Math.PI*2);
+  ctx.fill();
+
+  // Outfit (basit görsel temsil)
+  if (player.appearance.outfit !== "none"){
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y+4, evo.size-4, 0, Math.PI);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+};
+
+/* ---- MARKET DATA ---- */
+player.coins = 0;
+const SHOP_ITEMS = [
+  { id:"hoodie", name:"Neon Hoodie", price:150 },
+  { id:"jacket", name:"Cyber Jacket", price:300 },
+  { id:"aura+",  name:"Aura Booster", price:200 }
+];
+
+/* ---- XP'DEN COIN ---- */
+const _xpCoin = levelUp;
+levelUp = function(){
+  _xpCoin();
+  player.coins += 25;
+};
+
+/* ---- SHOP UI ---- */
+const shopBtn = document.createElement("button");
+shopBtn.textContent = "SHOP";
+shopBtn.style.cssText = `
+  position:fixed; top:12px; right:12px;
+  background:#0ff2; color:#eaf2ff;
+  border:1px solid #0ff;
+  padding:6px 10px;
+`;
+document.body.appendChild(shopBtn);
+
+const shopPanel = document.createElement("div");
+shopPanel.style.cssText = `
+  position:fixed; inset:20%;
+  background:#02030a;
+  border:2px solid #0ff;
+  color:#eaf2ff;
+  padding:12px;
+  display:none;
+`;
+document.body.appendChild(shopPanel);
+
+shopBtn.onclick = ()=>{
+  shopPanel.style.display = shopPanel.style.display==="none"?"block":"none";
+  renderShop();
+};
+
+function renderShop(){
+  shopPanel.innerHTML = `<b>COINS:</b> ${player.coins}<hr>`;
+  SHOP_ITEMS.forEach(it=>{
+    const b = document.createElement("button");
+    b.textContent = `${it.name} (${it.price})`;
+    b.style.display="block";
+    b.onclick = ()=>{
+      if (player.coins >= it.price){
+        player.coins -= it.price;
+        if (it.id==="aura+") player.auraRadius += 6;
+        else player.appearance.outfit = it.id;
+        renderShop();
+      }
+    };
+    shopPanel.appendChild(b);
+  });
+}
 
 </script>
 </body>
