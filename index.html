@@ -1369,6 +1369,156 @@ renderSettings = function(){
     };
   }
 };
+/* =========================
+   ONLINE LEADERBOARD (FIREBASE)
+========================= */
+
+// Firebase SDK ekle
+const fbScript1 = document.createElement("script");
+fbScript1.src = "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+document.head.appendChild(fbScript1);
+
+const fbScript2 = document.createElement("script");
+fbScript2.src = "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+document.head.appendChild(fbScript2);
+
+setTimeout(() => {
+
+  const firebaseConfig = {
+    apiKey: "BURAYA_API_KEY",
+    authDomain: "BURAYA_AUTH_DOMAIN",
+    databaseURL: "BURAYA_DATABASE_URL",
+    projectId: "BURAYA_PROJECT_ID",
+    storageBucket: "BURAYA_STORAGE",
+    messagingSenderId: "BURAYA_ID",
+    appId: "BURAYA_APP_ID"
+  };
+
+  const app = firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+
+  // İsim sor
+  let playerName = localStorage.getItem("playerName");
+  if (!playerName) {
+    playerName = prompt("İsmini gir:");
+    localStorage.setItem("playerName", playerName);
+  }
+
+  function submitScore() {
+    database.ref("leaderboard/" + playerName).set({
+      level: player.level,
+      coins: player.coins,
+      time: Date.now()
+    });
+  }
+
+  // 30 saniyede bir score gönder
+  setInterval(submitScore, 30000);
+
+  // Leaderboard UI
+  const lbPanel = document.createElement("div");
+  lbPanel.style.cssText = `
+    position:fixed;
+    left:12px;
+    top:80px;
+    background:#000;
+    color:#0ff;
+    border:1px solid #0ff;
+    padding:8px;
+    max-height:300px;
+    overflow:auto;
+    font-size:12px;
+  `;
+  document.body.appendChild(lbPanel);
+
+  database.ref("leaderboard").on("value", snapshot => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    const arr = Object.entries(data)
+      .sort((a,b) => b[1].level - a[1].level)
+      .slice(0,10);
+
+    lbPanel.innerHTML = "<b>🏆 LEADERBOARD</b><hr>";
+    arr.forEach((p,i) => {
+      lbPanel.innerHTML += `
+        ${i+1}. ${p[0]} - Lv ${p[1].level}<br>
+      `;
+    });
+  });
+
+}, 1000);
+/* =========================
+   FIREBASE ONLINE LEADERBOARD (MODERN v10)
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js").then(appModule => {
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
+
+  const { initializeApp } = appModule;
+  const { getDatabase, ref, set, onValue } = dbModule;
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
+    authDomain: "pixelroom-ae218.firebaseapp.com",
+    databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "pixelroom-ae218",
+    storageBucket: "pixelroom-ae218.firebasestorage.app",
+    messagingSenderId: "720297722320",
+    appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const database = getDatabase(app);
+
+  let playerName = localStorage.getItem("playerName");
+  if (!playerName) {
+    playerName = prompt("İsmini gir:");
+    localStorage.setItem("playerName", playerName);
+  }
+
+  function submitScore() {
+    set(ref(database, "leaderboard/" + playerName), {
+      level: player.level,
+      coins: player.coins,
+      timestamp: Date.now()
+    });
+  }
+
+  setInterval(submitScore, 30000);
+
+  const lbPanel = document.createElement("div");
+  lbPanel.style.cssText = `
+    position:fixed;
+    left:12px;
+    top:80px;
+    background:#000;
+    color:#0ff;
+    border:1px solid #0ff;
+    padding:8px;
+    max-height:300px;
+    overflow:auto;
+    font-size:12px;
+  `;
+  document.body.appendChild(lbPanel);
+
+  onValue(ref(database, "leaderboard"), snapshot => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    const arr = Object.entries(data)
+      .sort((a,b) => b[1].level - a[1].level)
+      .slice(0,10);
+
+    lbPanel.innerHTML = "<b>🏆 ONLINE LEADERBOARD</b><hr>";
+    arr.forEach((p,i) => {
+      lbPanel.innerHTML += `${i+1}. ${p[0]} - Lv ${p[1].level}<br>`;
+    });
+  });
+
+});
+});
+
 
 </script>
 </body>
