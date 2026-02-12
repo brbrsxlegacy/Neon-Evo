@@ -2,164 +2,121 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>NEON RISE ONLINE</title>
+<title>NEON RISE CLEAN</title>
 <style>
-body { margin:0; background:#000; color:#0ff; font-family:Arial; overflow:hidden; }
+body { margin:0; background:#000; color:#0ff; overflow:hidden; font-family:Arial; }
 canvas { display:block; }
-button { padding:6px 10px; margin:4px; }
 #menu {
-  position:fixed; inset:0;
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  background:#000; z-index:10;
+position:fixed; inset:0;
+display:flex; flex-direction:column;
+align-items:center; justify-content:center;
+background:#000; z-index:10;
 }
 #hud { position:fixed; top:10px; left:10px; }
+button { margin:5px; padding:6px 10px; }
 </style>
 </head>
 <body>
 
 <div id="menu">
-  <h1>NEON RISE ONLINE</h1>
-  <button onclick="createRoom()">ODA OLUŞTUR</button>
-  <button onclick="joinRoom()">ODAYA GİR</button>
+<h1>NEON RISE</h1>
+<button onclick="createRoom()">ODA OLUŞTUR</button>
+<button onclick="joinRoom()">ODAYA GİR</button>
 </div>
 
 <div id="hud"></div>
 <canvas id="game"></canvas>
 
-<!-- FIREBASE CDN (404 YOK) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
 <script>
 
 /* =========================
-   FIREBASE INIT
+   FIREBASE
 ========================= */
 
 const firebaseConfig = {
-  apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
-  authDomain: "pixelroom-ae218.firebaseapp.com",
-  databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "pixelroom-ae218",
-  storageBucket: "pixelroom-ae218.firebasestorage.app",
-  messagingSenderId: "720297722320",
-  appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
+apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
+authDomain: "pixelroom-ae218.firebaseapp.com",
+databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
+projectId: "pixelroom-ae218"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 /* =========================
-   CORE
+   CORE STATE
 ========================= */
 
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const hud=document.getElementById("hud");
 
-const hud = document.getElementById("hud");
+function resize(){
+canvas.width=innerWidth;
+canvas.height=innerHeight;
+}
+resize();
+addEventListener("resize",resize);
 
-let currentRoom = null;
-let playerId = "p_"+Math.random().toString(36).substr(2,5);
-let myRef = null;
-let remotePlayers = {};
+let currentRoom=null;
+let playerId="p_"+Math.random().toString(36).substr(2,5);
+let myRef=null;
+let remotePlayers={};
 
-let player = {
-  x:0,y:0,
-  level:1,
-  hp:100,
-  speed:3
+let player={
+x:0,y:0,
+level:1,
+hp:100,
+maxHp:100,
+xp:0,
+xpToNext:100,
+speed:3,
+dashCooldown:0,
+dashing:0,
+spawnShield:0,
+inventory:[],
+equippedSkin:null,
+clan:null
 };
 
-/* =========================
-   RANK
-========================= */
-
-function getRank(lv){
-  if(lv>=80) return "NEON GOD";
-  if(lv>=50) return "DIAMOND";
-  if(lv>=25) return "GOLD";
-  if(lv>=10) return "SILVER";
-  return "BRONZE";
-}
+const skinPool=["#0ff","#f0f","#0f0","#ff0","#ff6600","#ffffff"];
 
 /* =========================
-   ROOM SYSTEM
+   ROOM
 ========================= */
 
-function createRoom(){
-  const roomName = "room_"+Math.random().toString(36).substr(2,4);
-
-  db.ref("rooms/"+roomName+"/meta").set({
-    respawn:{x:0,y:0}
-  });
-
-  connectRoom(roomName);
+window.createRoom=function(){
+const room="room_"+Math.random().toString(36).substr(2,4);
+db.ref("rooms/"+room+"/meta").set({respawn:{x:0,y:0}});
+connect(room);
 }
 
-function joinRoom(){
-  db.ref("rooms").once("value").then(snap=>{
-    const rooms = snap.val()||{};
-    for(const r in rooms){
-      const count = rooms[r].players?Object.keys(rooms[r].players).length:0;
-      if(count<10){
-        connectRoom(r);
-        return;
-      }
-    }
-    alert("Boş oda yok");
-  });
+window.joinRoom=function(){
+db.ref("rooms").once("value").then(s=>{
+const rooms=s.val()||{};
+for(const r in rooms){
+const count=rooms[r].players?Object.keys(rooms[r].players).length:0;
+if(count<10){connect(r);return;}
+}
+alert("Boş oda yok");
+});
 }
 
-function connectRoom(roomName){
-
-  document.getElementById("menu").style.display="none";
-  currentRoom = roomName;
-
-  db.ref("rooms/"+roomName+"/meta").once("value").then(meta=>{
-    const spawn = meta.val().respawn;
-    player.x = spawn.x;
-    player.y = spawn.y;
-  });
-
-  myRef = db.ref("rooms/"+roomName+"/players/"+playerId);
-
-  myRef.set({
-    x:player.x,
-    y:player.y,
-    level:player.level,
-    hp:player.hp
-  });
-
-  myRef.onDisconnect().remove();
-
-  db.ref("rooms/"+roomName+"/players").on("value",snap=>{
-    const data = snap.val()||{};
-    remotePlayers={};
-    for(const id in data){
-      if(id!==playerId){
-        remotePlayers[id]=data[id];
-      }
-    }
-  });
-
-  setInterval(syncPlayer,100);
-}
-
-/* =========================
-   SYNC
-========================= */
-
-function syncPlayer(){
-  if(!currentRoom) return;
-  myRef.set({
-    x:player.x,
-    y:player.y,
-    level:player.level,
-    hp:player.hp
-  });
+function connect(room){
+document.getElementById("menu").style.display="none";
+currentRoom=room;
+myRef=db.ref("rooms/"+room+"/players/"+playerId);
+myRef.set(player);
+myRef.onDisconnect().remove();
+db.ref("rooms/"+room+"/players").on("value",s=>{
+const data=s.val()||{};
+remotePlayers={};
+for(const id in data)
+if(id!==playerId) remotePlayers[id]=data[id];
+});
 }
 
 /* =========================
@@ -167,8 +124,86 @@ function syncPlayer(){
 ========================= */
 
 let keys={};
-onkeydown=e=>keys[e.key]=true;
+onkeydown=e=>{
+keys[e.key]=true;
+if(e.key==="Shift") dash();
+};
 onkeyup=e=>keys[e.key]=false;
+
+/* =========================
+   SYSTEMS
+========================= */
+
+function dash(){
+if(player.dashCooldown>0)return;
+const p=120;
+if(keys["w"])player.y-=p;
+if(keys["s"])player.y+=p;
+if(keys["a"])player.x-=p;
+if(keys["d"])player.x+=p;
+player.dashing=0.2;
+player.dashCooldown=2;
+}
+
+function gainXP(a){
+player.xp+=a;
+if(player.xp>=player.xpToNext){
+player.level++;
+player.xp=0;
+}
+}
+
+function respawn(){
+player.hp=player.maxHp;
+player.spawnShield=3;
+}
+
+function dealDamage(id){
+const ref=db.ref("rooms/"+currentRoom+"/players/"+id);
+ref.transaction(data=>{
+if(!data)return;
+data.hp=(data.hp||100)-25;
+if(data.hp<=0){
+player.level+=data.level||1;
+data.level=1;
+data.hp=100;
+}
+return data;
+});
+}
+
+/* =========================
+   BOSS
+========================= */
+
+let boss=null;
+let bossTimer=0;
+
+function spawnBoss(){
+boss={x:player.x+300,y:player.y,hp:400,maxHp:400,size:40};
+}
+
+function updateBoss(){
+if(!boss)return;
+const dx=player.x-boss.x;
+const dy=player.y-boss.y;
+const d=Math.hypot(dx,dy);
+if(d>5){boss.x+=dx/d*1.2;boss.y+=dy/d*1.2;}
+if(d<50&&player.spawnShield<=0)player.hp-=0.4;
+}
+
+function damageBoss(){
+if(!boss)return;
+const d=Math.hypot(player.x-boss.x,player.y-boss.y);
+if(d<60){
+boss.hp-=20;
+if(boss.hp<=0){
+gainXP(50);
+player.inventory.push(skinPool[Math.floor(Math.random()*skinPool.length)]);
+boss=null;
+}
+}
+}
 
 /* =========================
    UPDATE
@@ -176,35 +211,38 @@ onkeyup=e=>keys[e.key]=false;
 
 function update(){
 
-  if(keys["w"]) player.y-=player.speed;
-  if(keys["s"]) player.y+=player.speed;
-  if(keys["a"]) player.x-=player.speed;
-  if(keys["d"]) player.x+=player.speed;
+if(keys["w"])player.y-=player.speed;
+if(keys["s"])player.y+=player.speed;
+if(keys["a"])player.x-=player.speed;
+if(keys["d"])player.x+=player.speed;
 
-  for(const id in remotePlayers){
-    const p=remotePlayers[id];
-    const dist=Math.hypot(player.x-p.x,player.y-p.y);
-    if(dist<30 && keys[" "]){
-      stealLevel(id);
-    }
-  }
-
-  hud.innerHTML="Level: "+player.level+
-                " | Rank: "+getRank(player.level);
+if(keys[" "]){
+for(const id in remotePlayers){
+const p=remotePlayers[id];
+if(Math.hypot(player.x-p.x,player.y-p.y)<40&&player.spawnShield<=0)
+dealDamage(id);
+}
+damageBoss();
 }
 
-function stealLevel(targetId){
+if(player.hp<=0)respawn();
 
-  const targetRef=db.ref("rooms/"+currentRoom+"/players/"+targetId);
+if(player.spawnShield>0)player.spawnShield-=1/60;
+if(player.dashCooldown>0)player.dashCooldown-=1/60;
+if(player.dashing>0)player.dashing-=1/60;
 
-  targetRef.transaction(data=>{
-    if(!data) return;
-    if(data.level>1){
-      player.level+=data.level;
-      data.level=1;
-    }
-    return data;
-  });
+bossTimer+=1/60;
+if(!boss && Object.keys(remotePlayers).length+1>=3 && bossTimer>30){
+spawnBoss();
+bossTimer=0;
+}
+
+updateBoss();
+
+if(currentRoom)
+myRef.set(player);
+
+hud.innerHTML="HP:"+Math.floor(player.hp)+" | LV:"+player.level;
 }
 
 /* =========================
@@ -213,23 +251,46 @@ function stealLevel(targetId){
 
 function draw(){
 
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.fillStyle="#050510";
+ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.fillStyle="#0ff";
-  ctx.beginPath();
-  ctx.arc(canvas.width/2,canvas.height/2,15,0,Math.PI*2);
-  ctx.fill();
+// grid
+ctx.strokeStyle="rgba(0,255,255,0.08)";
+for(let x=-(player.x%60);x<canvas.width;x+=60){
+ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();
+}
+for(let y=-(player.y%60);y<canvas.height;y+=60){
+ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();
+}
 
-  for(const id in remotePlayers){
-    const p=remotePlayers[id];
-    ctx.fillStyle="#f0f";
-    ctx.beginPath();
-    ctx.arc(
-      canvas.width/2+(p.x-player.x),
-      canvas.height/2+(p.y-player.y),
-      15,0,Math.PI*2);
-    ctx.fill();
-  }
+// player
+ctx.save();
+ctx.translate(canvas.width/2,canvas.height/2);
+ctx.shadowBlur=25;
+ctx.shadowColor=player.equippedSkin||"#0ff";
+ctx.fillStyle=player.equippedSkin||"#0ff";
+ctx.beginPath();ctx.arc(0,0,18,0,Math.PI*2);ctx.fill();
+ctx.restore();
+
+// remote
+for(const id in remotePlayers){
+const p=remotePlayers[id];
+ctx.save();
+ctx.translate(canvas.width/2+(p.x-player.x),canvas.height/2+(p.y-player.y));
+ctx.fillStyle="#f0f";
+ctx.beginPath();ctx.arc(0,0,15,0,Math.PI*2);ctx.fill();
+ctx.restore();
+}
+
+// boss
+if(boss){
+ctx.save();
+ctx.translate(canvas.width/2+(boss.x-player.x),canvas.height/2+(boss.y-player.y));
+ctx.fillStyle="#ff0000";
+ctx.beginPath();ctx.arc(0,0,boss.size,0,Math.PI*2);ctx.fill();
+ctx.restore();
+}
+
 }
 
 /* =========================
@@ -237,736 +298,11 @@ function draw(){
 ========================= */
 
 function loop(){
-  update();
-  draw();
-  requestAnimationFrame(loop);
+update();
+draw();
+requestAnimationFrame(loop);
 }
 loop();
-/* =========================
-   VISUAL & MOBILE UPGRADE
-========================= */
-
-// Responsive canvas
-function resizeCanvas(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
-
-// Parallax yıldızlar
-const stars = [];
-for(let i=0;i<120;i++){
-  stars.push({
-    x:Math.random()*2000-1000,
-    y:Math.random()*2000-1000,
-    size:Math.random()*2+1
-  });
-}
-
-// Mobil joystick
-let touchActive=false;
-let joyX=0, joyY=0;
-
-canvas.addEventListener("touchstart", e=>{
-  touchActive=true;
-});
-
-canvas.addEventListener("touchmove", e=>{
-  const t=e.touches[0];
-  joyX=(t.clientX-canvas.width/2)/80;
-  joyY=(t.clientY-canvas.height/2)/80;
-});
-
-canvas.addEventListener("touchend", ()=>{
-  touchActive=false;
-  joyX=0; joyY=0;
-});
-
-// Update override (mobil destekli)
-const _updateVisual = update;
-update = function(){
-
-  _updateVisual();
-
-  if(touchActive){
-    player.x += joyX*player.speed;
-    player.y += joyY*player.speed;
-  }
-};
-
-// Draw override
-const _drawVisual = draw;
-draw = function(){
-
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  // Yıldız arkaplan
-  ctx.fillStyle="#050510";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  ctx.save();
-  ctx.translate(canvas.width/2,canvas.height/2);
-
-  stars.forEach(s=>{
-    ctx.fillStyle="#111";
-    ctx.beginPath();
-    ctx.arc(
-      s.x-player.x*0.2,
-      s.y-player.y*0.2,
-      s.size,
-      0,Math.PI*2
-    );
-    ctx.fill();
-  });
-
-  ctx.restore();
-
-  // Eski draw (oyuncular)
-  _drawVisual();
-
-  // Oyuncu glow
-  ctx.save();
-  ctx.translate(canvas.width/2,canvas.height/2);
-
-  ctx.shadowBlur=25;
-  ctx.shadowColor="#0ff";
-  ctx.fillStyle="#0ff";
-  ctx.beginPath();
-  ctx.arc(0,0,18,0,Math.PI*2);
-  ctx.fill();
-
-  ctx.restore();
-};
-/* =========================
-   CHARACTER & BACKGROUND PRO UPGRADE
-========================= */
-
-// Neon grid arkaplan
-function drawBackground(){
-
-  ctx.fillStyle="#050510";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  ctx.strokeStyle="rgba(0,255,255,0.08)";
-  ctx.lineWidth=1;
-
-  const gridSize=60;
-
-  for(let x=-(player.x%gridSize); x<canvas.width; x+=gridSize){
-    ctx.beginPath();
-    ctx.moveTo(x,0);
-    ctx.lineTo(x,canvas.height);
-    ctx.stroke();
-  }
-
-  for(let y=-(player.y%gridSize); y<canvas.height; y+=gridSize){
-    ctx.beginPath();
-    ctx.moveTo(0,y);
-    ctx.lineTo(canvas.width,y);
-    ctx.stroke();
-  }
-}
-
-// Yeni karakter çizimi
-function drawPlayer(){
-
-  ctx.save();
-  ctx.translate(canvas.width/2,canvas.height/2);
-
-  // Glow aura
-  ctx.shadowBlur=25;
-  ctx.shadowColor="#0ff";
-
-  // Gövde
-  ctx.fillStyle="#0ff";
-  ctx.fillRect(-12,-18,24,36);
-
-  // Baş
-  ctx.beginPath();
-  ctx.arc(0,-28,12,0,Math.PI*2);
-  ctx.fill();
-
-  // Gözler
-  ctx.shadowBlur=0;
-  ctx.fillStyle="#000";
-  ctx.fillRect(-5,-32,4,4);
-  ctx.fillRect(1,-32,4,4);
-
-  ctx.restore();
-}
-
-// Remote player upgrade
-function drawRemotePlayer(p){
-
-  ctx.save();
-  ctx.translate(
-    canvas.width/2+(p.x-player.x),
-    canvas.height/2+(p.y-player.y)
-  );
-
-  ctx.shadowBlur=20;
-  ctx.shadowColor="#f0f";
-  ctx.fillStyle="#f0f";
-
-  ctx.fillRect(-12,-18,24,36);
-  ctx.beginPath();
-  ctx.arc(0,-28,12,0,Math.PI*2);
-  ctx.fill();
-
-  ctx.restore();
-}
-
-// DRAW override
-draw = function(){
-
-  drawBackground();
-
-  drawPlayer();
-
-  for(const id in remotePlayers){
-    drawRemotePlayer(remotePlayers[id]);
-  }
-};
-/* =========================
-   MOBILE ATTACK BUTTON
-========================= */
-
-const attackBtn=document.createElement("div");
-attackBtn.style.cssText=`
-position:fixed;
-bottom:40px;
-right:40px;
-width:70px;
-height:70px;
-border-radius:50%;
-background:rgba(255,0,255,0.2);
-border:2px solid #f0f;
-display:flex;
-align-items:center;
-justify-content:center;
-color:#f0f;
-font-weight:bold;
-`;
-attackBtn.innerText="⚔";
-document.body.appendChild(attackBtn);
-
-attackBtn.addEventListener("touchstart",()=>{
-  keys[" "]=true;
-});
-attackBtn.addEventListener("touchend",()=>{
-  keys[" "]=false;
-});
-/* =========================
-   COMBAT SYSTEM REWORK
-========================= */
-
-player.maxHp = 100;
-player.hp = 100;
-player.spawnShield = 0;
-
-// Respawn fonksiyonu
-function respawn() {
-  player.hp = player.maxHp;
-  player.spawnShield = 3; // 3 saniye koruma
-}
-
-// Damage verme
-function dealDamage(targetId) {
-
-  if (!currentRoom) return;
-
-  const targetRef = db.ref("rooms/"+currentRoom+"/players/"+targetId);
-
-  targetRef.transaction(data => {
-    if (!data) return;
-
-    if (data.hp === undefined) data.hp = 100;
-
-    data.hp -= 25;
-
-    if (data.hp <= 0) {
-      player.level += data.level || 1;
-      data.level = 1;
-      data.hp = 100;
-    }
-
-    return data;
-  });
-}
-
-// Update override
-const _updateCombat = update;
-update = function() {
-
-  _updateCombat();
-
-  // Spawn shield sayacı
-  if (player.spawnShield > 0) {
-    player.spawnShield -= 1/60;
-  }
-
-  // PvP kontrol
-  if (keys[" "]) {
-    for (const id in remotePlayers) {
-      const p = remotePlayers[id];
-      const dist = Math.hypot(player.x - p.x, player.y - p.y);
-
-      if (dist < 40 && player.spawnShield <= 0) {
-        dealDamage(id);
-      }
-    }
-  }
-
-  // Ölüm kontrol
-  if (player.hp <= 0) {
-    respawn();
-  }
-
-  hud.innerHTML =
-    "HP: "+player.hp+
-    " | Level: "+player.level+
-    " | Rank: "+getRank(player.level);
-};
-
-// Sync hp de gönder
-function syncPlayer(){
-  if(!currentRoom) return;
-  myRef.set({
-    x:player.x,
-    y:player.y,
-    level:player.level,
-    hp:player.hp
-  });
-}
-/* =========================
-   MINI BOSS SYSTEM
-========================= */
-
-let boss = null;
-let bossSpawnTimer = 0;
-
-function spawnBoss() {
-
-  boss = {
-    x: player.x + 300,
-    y: player.y,
-    hp: 500,
-    maxHp: 500,
-    size: 40,
-    alive: true
-  };
-
-}
-
-function updateBoss() {
-
-  if (!boss || !boss.alive) return;
-
-  // Basit takip AI
-  const dx = player.x - boss.x;
-  const dy = player.y - boss.y;
-  const dist = Math.hypot(dx, dy);
-
-  if (dist > 5) {
-    boss.x += dx / dist * 1.2;
-    boss.y += dy / dist * 1.2;
-  }
-
-  // Boss damage player
-  if (dist < 50 && player.spawnShield <= 0) {
-    player.hp -= 0.3;
-  }
-
-}
-
-function drawBoss() {
-
-  if (!boss || !boss.alive) return;
-
-  ctx.save();
-
-  ctx.translate(
-    canvas.width/2 + (boss.x - player.x),
-    canvas.height/2 + (boss.y - player.y)
-  );
-
-  ctx.shadowBlur = 30;
-  ctx.shadowColor = "#ff0000";
-
-  ctx.fillStyle = "#ff0000";
-  ctx.beginPath();
-  ctx.arc(0,0,boss.size,0,Math.PI*2);
-  ctx.fill();
-
-  ctx.restore();
-
-  // Boss HP bar
-  ctx.fillStyle = "black";
-  ctx.fillRect(canvas.width/2 - 150, 20, 300, 20);
-
-  ctx.fillStyle = "red";
-  ctx.fillRect(
-    canvas.width/2 - 150,
-    20,
-    300 * (boss.hp / boss.maxHp),
-    20
-  );
-}
-
-// Boss damage
-function damageBoss() {
-
-  if (!boss || !boss.alive) return;
-
-  const dist = Math.hypot(player.x - boss.x, player.y - boss.y);
-
-  if (dist < 60) {
-    boss.hp -= 20;
-
-    if (boss.hp <= 0) {
-      boss.alive = false;
-      player.level += 5; // Boss reward
-    }
-  }
-
-}
-
-// Update override
-const _updateBossMain = update;
-update = function() {
-
-  _updateBossMain();
-
-  const playerCount = Object.keys(remotePlayers).length + 1;
-
-  bossSpawnTimer += 1/60;
-
-  if (!boss && playerCount >= 3 && bossSpawnTimer > 30) {
-    spawnBoss();
-    bossSpawnTimer = 0;
-  }
-
-  updateBoss();
-
-  if (keys[" "]){
-    damageBoss();
-  }
-
-};
-
-// Draw override
-const _drawBossMain = draw;
-draw = function() {
-
-  _drawBossMain();
-
-  drawBoss();
-
-};
-/* =========================
-   LOOT + INVENTORY SYSTEM
-========================= */
-
-player.inventory = [];
-player.equippedSkin = null;
-
-const skinPool = [
-  "#0ff",
-  "#f0f",
-  "#0f0",
-  "#ff0",
-  "#ff6600",
-  "#00ffaa",
-  "#ffffff"
-];
-
-function dropLoot() {
-
-  const randomSkin = skinPool[
-    Math.floor(Math.random()*skinPool.length)
-  ];
-
-  player.inventory.push(randomSkin);
-
-  alert("Yeni Skin Kazandın!");
-
-}
-
-// Boss öldüğünde loot ver
-const _spawnBossCheck = spawnBoss;
-spawnBoss = function(){
-  _spawnBossCheck();
-};
-
-// Boss ölüm override
-const _damageBossCheck = damageBoss;
-damageBoss = function(){
-
-  if (!boss || !boss.alive) return;
-
-  const prevHp = boss.hp;
-
-  _damageBossCheck();
-
-  if (prevHp > 0 && boss.hp <= 0) {
-    dropLoot();
-  }
-
-};
-
-// Dolap UI
-const wardrobeBtn = document.createElement("button");
-wardrobeBtn.innerText = "DOLAP";
-wardrobeBtn.style.position="fixed";
-wardrobeBtn.style.right="20px";
-wardrobeBtn.style.top="20px";
-document.body.appendChild(wardrobeBtn);
-
-const wardrobePanel = document.createElement("div");
-wardrobePanel.style.cssText = `
-position:fixed;
-inset:20%;
-background:#000;
-border:2px solid #0ff;
-display:none;
-flex-wrap:wrap;
-padding:20px;
-`;
-document.body.appendChild(wardrobePanel);
-
-wardrobeBtn.onclick = ()=>{
-  wardrobePanel.style.display =
-    wardrobePanel.style.display==="none"?"flex":"none";
-
-  wardrobePanel.innerHTML="";
-
-  player.inventory.forEach(color=>{
-    const skinBox=document.createElement("div");
-    skinBox.style.width="60px";
-    skinBox.style.height="60px";
-    skinBox.style.margin="10px";
-    skinBox.style.background=color;
-    skinBox.style.cursor="pointer";
-
-    skinBox.onclick=()=>{
-      player.equippedSkin=color;
-      wardrobePanel.style.display="none";
-    };
-
-    wardrobePanel.appendChild(skinBox);
-  });
-};
-
-// Karakter rengini override
-const _drawSkin = draw;
-draw = function(){
-
-  _drawSkin();
-
-  if(player.equippedSkin){
-    ctx.save();
-    ctx.translate(canvas.width/2,canvas.height/2);
-
-    ctx.shadowBlur=30;
-    ctx.shadowColor=player.equippedSkin;
-    ctx.fillStyle=player.equippedSkin;
-
-    ctx.beginPath();
-    ctx.arc(0,0,18,0,Math.PI*2);
-    ctx.fill();
-
-    ctx.restore();
-  }
-};
-
-/* =========================
-   CLAN TAG DISPLAY
-========================= */
-
-const _drawClanTag = draw;
-draw = function(){
-
-  _drawClanTag();
-
-  // Kendi tag
-  if(player.clan){
-    ctx.fillStyle="#fff";
-    ctx.fillText(
-      "["+player.clan+"]",
-      canvas.width/2-30,
-      canvas.height/2-40
-    );
-  }
-
-  // Remote tag
-  for(const id in remotePlayers){
-    const p = remotePlayers[id];
-
-    ctx.fillStyle="#fff";
-    ctx.fillText(
-      id,
-      canvas.width/2+(p.x-player.x)-20,
-      canvas.height/2+(p.y-player.y)-40
-    );
-  }
-};
-
-/* =========================
-   GLOBAL LEADERBOARD
-========================= */
-
-const lbPanel=document.createElement("div");
-lbPanel.style.cssText=`
-position:fixed;
-right:10px;
-bottom:10px;
-background:#000;
-border:2px solid #0ff;
-padding:10px;
-width:200px;
-max-height:250px;
-overflow:auto;
-font-size:12px;
-`;
-document.body.appendChild(lbPanel);
-
-// Score gönder
-setInterval(()=>{
-  db.ref("leaderboard/"+playerId).set({
-    level:player.level,
-    clan:player.clan||"none"
-  });
-},3000);
-
-// Liste çek
-db.ref("leaderboard").on("value",snap=>{
-  const data=snap.val()||{};
-  const arr=Object.entries(data)
-    .sort((a,b)=>b[1].level-a[1].level)
-    .slice(0,10);
-
-  lbPanel.innerHTML="<b>GLOBAL RANK</b><hr>";
-
-  arr.forEach((p,i)=>{
-    lbPanel.innerHTML+=
-      (i+1)+". "+p[0]+" - "+p[1].level+
-      "<br>";
-  });
-});
-/* =========================
-   CLAN LEADERBOARD
-========================= */
-
-db.ref("clans").on("value",snap=>{
-  const clans=snap.val()||{};
-  let clanStats=[];
-
-  for(const name in clans){
-    const members=clans[name].members||{};
-    clanStats.push({
-      name:name,
-      count:Object.keys(members).length
-    });
-  }
-
-  clanStats.sort((a,b)=>b.count-a.count);
-
-  lbPanel.innerHTML+="<hr><b>CLAN RANK</b><br>";
-
-  clanStats.slice(0,5).forEach((c,i)=>{
-    lbPanel.innerHTML+=
-      (i+1)+". "+c.name+
-      " ("+c.count+")<br>";
-  });
-});
-const dashBtn=document.createElement("div");
-dashBtn.innerText="⚡";
-dashBtn.style.cssText=`
-position:fixed;
-bottom:120px;
-right:40px;
-width:70px;
-height:70px;
-border-radius:50%;
-background:rgba(0,255,255,0.2);
-border:2px solid #0ff;
-display:flex;
-align-items:center;
-justify-content:center;
-color:#0ff;
-font-weight:bold;
-`;
-document.body.appendChild(dashBtn);
-
-dashBtn.addEventListener("touchstart",dash);
-/* =========================
-   XP BAR SYSTEM
-========================= */
-
-player.xp = 0;
-player.xpToNext = 100;
-
-function gainXP(amount){
-  player.xp += amount;
-
-  if(player.xp >= player.xpToNext){
-    player.level++;
-    player.xp = 0;
-  }
-}
-
-// Boss öldüğünde XP ver
-const _bossRewardXP = damageBoss;
-damageBoss = function(){
-
-  const prev = boss?.hp;
-
-  _bossRewardXP();
-
-  if(prev>0 && boss && boss.hp<=0){
-    gainXP(50);
-  }
-};
-
-// XP BAR DRAW
-const _drawXP = draw;
-draw = function(){
-
-  _drawXP();
-
-  ctx.fillStyle="black";
-  ctx.fillRect(20,canvas.height-40,200,20);
-
-  ctx.fillStyle="#0ff";
-  ctx.fillRect(
-    20,
-    canvas.height-40,
-    200*(player.xp/player.xpToNext),
-    20
-  );
-};
-const _drawDashEffect = draw;
-draw = function(){
-
-  _drawDashEffect();
-
-  if(player.dashing > 0){
-
-    ctx.save();
-    ctx.translate(canvas.width/2,canvas.height/2);
-
-    ctx.shadowBlur=40;
-    ctx.shadowColor="#0ff";
-    ctx.strokeStyle="#0ff";
-    ctx.lineWidth=4;
-    ctx.beginPath();
-    ctx.arc(0,0,25,0,Math.PI*2);
-    ctx.stroke();
-
-    ctx.restore();
-  }
-};
 
 </script>
 </body>
