@@ -1911,6 +1911,155 @@ function joinRoom(roomName){
 }
 
 });
+/* =========================
+   MAIN MENU ROOM SYSTEM + RESPAWN
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
+
+const { getDatabase, ref, set, get, remove, onDisconnect, onValue } = dbModule;
+const db = getDatabase();
+
+let currentRoom = null;
+let myPlayerRef = null;
+let myPlayerId = localStorage.getItem("playerName") || 
+                 "p_"+Math.random().toString(36).substr(2,9);
+
+localStorage.setItem("playerName", myPlayerId);
+
+/* ---------- ANA MENÜ ---------- */
+
+const mainMenu = document.createElement("div");
+mainMenu.style.cssText = `
+  position:fixed;
+  inset:0;
+  background:#000;
+  color:#0ff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  z-index:999999;
+`;
+mainMenu.innerHTML = `
+  <h1>NEON RISE ONLINE</h1>
+  <button id="createRoomBtn">ODA OLUŞTUR</button>
+  <button id="joinRoomBtn">ODAYA GİR</button>
+`;
+document.body.appendChild(mainMenu);
+
+/* ---------- ODA OLUŞTUR ---------- */
+
+document.getElementById("createRoomBtn").onclick = async () => {
+
+  const roomName = "room_" + Math.random().toString(36).substr(2,5);
+
+  // Respawn noktası oluştur
+  await set(ref(db, `rooms/${roomName}/meta`), {
+    respawn: {
+      x: 0,
+      y: 0
+    }
+  });
+
+  joinRoom(roomName);
+  mainMenu.style.display="none";
+};
+
+/* ---------- ODAYA GİR ---------- */
+
+document.getElementById("joinRoomBtn").onclick = async () => {
+
+  const roomsSnap = await get(ref(db, "rooms"));
+  const rooms = roomsSnap.val() || {};
+
+  for (const roomName in rooms) {
+
+    const players = rooms[roomName].players || {};
+    const count = Object.keys(players).length;
+
+    if (count < 10) {
+      joinRoom(roomName);
+      mainMenu.style.display="none";
+      return;
+    }
+  }
+
+  alert("Boş oda yok!");
+};
+
+/* ---------- ODAYA KATIL ---------- */
+
+async function joinRoom(roomName){
+
+  if (myPlayerRef){
+    remove(myPlayerRef);
+  }
+
+  currentRoom = roomName;
+
+  const roomMeta = await get(ref(db, `rooms/${roomName}/meta`));
+  const respawn = roomMeta.val()?.respawn || {x:0,y:0};
+
+  // Respawn konumuna ışınla
+  player.x = respawn.x;
+  player.y = respawn.y;
+
+  myPlayerRef = ref(db, `rooms/${roomName}/players/${myPlayerId}`);
+
+  await set(myPlayerRef, {
+    x: player.x,
+    y: player.y,
+    level: player.level,
+    hp: player.health
+  });
+
+  onDisconnect(myPlayerRef).remove();
+
+  // Pozisyon sync
+  setInterval(()=>{
+    if (!currentRoom) return;
+    set(myPlayerRef,{
+      x: player.x,
+      y: player.y,
+      level: player.level,
+      hp: player.health
+    });
+  }, 120);
+
+  // Remote players
+  onValue(ref(db, `rooms/${roomName}/players`), snapshot=>{
+    const data = snapshot.val() || {};
+    Object.keys(remotePlayers).forEach(id=>delete remotePlayers[id]);
+
+    Object.entries(data).forEach(([id,p])=>{
+      if (id === myPlayerId) return;
+      remotePlayers[id] = p;
+    });
+  });
+
+}
+
+/* ---------- ÖLÜNCE RESPAWN ---------- */
+
+const _updateRespawn = update;
+update = function(dt){
+  _updateRespawn(dt);
+
+  if (player.health <= 0 && currentRoom){
+
+    get(ref(db, `rooms/${currentRoom}/meta`)).then(snap=>{
+      const respawn = snap.val()?.respawn || {x:0,y:0};
+      player.x = respawn.x;
+      player.y = respawn.y;
+    });
+
+    player.level = 1;
+    player.health = player.maxHealth;
+  }
+};
+
+});
 
 </script>
 </body>
