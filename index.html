@@ -779,121 +779,7 @@ draw = function(){
     ctx.restore();
   }
 };
-/* =========================
-   LOOT + INVENTORY SYSTEM
-========================= */
 
-player.inventory = [];
-player.equippedSkin = null;
-
-const skinPool = [
-  "#0ff",
-  "#f0f",
-  "#0f0",
-  "#ff0",
-  "#ff6600",
-  "#00ffaa",
-  "#ffffff"
-];
-
-function dropLoot() {
-
-  const randomSkin = skinPool[
-    Math.floor(Math.random()*skinPool.length)
-  ];
-
-  player.inventory.push(randomSkin);
-
-  alert("Yeni Skin Kazandın!");
-
-}
-
-// Boss öldüğünde loot ver
-const _spawnBossCheck = spawnBoss;
-spawnBoss = function(){
-  _spawnBossCheck();
-};
-
-// Boss ölüm override
-const _damageBossCheck = damageBoss;
-damageBoss = function(){
-
-  if (!boss || !boss.alive) return;
-
-  const prevHp = boss.hp;
-
-  _damageBossCheck();
-
-  if (prevHp > 0 && boss.hp <= 0) {
-    dropLoot();
-  }
-
-};
-
-// Dolap UI
-const wardrobeBtn = document.createElement("button");
-wardrobeBtn.innerText = "DOLAP";
-wardrobeBtn.style.position="fixed";
-wardrobeBtn.style.right="20px";
-wardrobeBtn.style.top="20px";
-document.body.appendChild(wardrobeBtn);
-
-const wardrobePanel = document.createElement("div");
-wardrobePanel.style.cssText = `
-position:fixed;
-inset:20%;
-background:#000;
-border:2px solid #0ff;
-display:none;
-flex-wrap:wrap;
-padding:20px;
-`;
-document.body.appendChild(wardrobePanel);
-
-wardrobeBtn.onclick = ()=>{
-  wardrobePanel.style.display =
-    wardrobePanel.style.display==="none"?"flex":"none";
-
-  wardrobePanel.innerHTML="";
-
-  player.inventory.forEach(color=>{
-    const skinBox=document.createElement("div");
-    skinBox.style.width="60px";
-    skinBox.style.height="60px";
-    skinBox.style.margin="10px";
-    skinBox.style.background=color;
-    skinBox.style.cursor="pointer";
-
-    skinBox.onclick=()=>{
-      player.equippedSkin=color;
-      wardrobePanel.style.display="none";
-    };
-
-    wardrobePanel.appendChild(skinBox);
-  });
-};
-
-// Karakter rengini override
-const _drawSkin = draw;
-draw = function(){
-
-  _drawSkin();
-
-  if(player.equippedSkin){
-    ctx.save();
-    ctx.translate(canvas.width/2,canvas.height/2);
-
-    ctx.shadowBlur=30;
-    ctx.shadowColor=player.equippedSkin;
-    ctx.fillStyle=player.equippedSkin;
-
-    ctx.beginPath();
-    ctx.arc(0,0,18,0,Math.PI*2);
-    ctx.fill();
-
-    ctx.restore();
-  }
-};
 /* =========================
    CLAN TAG DISPLAY
 ========================= */
@@ -925,37 +811,7 @@ draw = function(){
     );
   }
 };
-/* =========================
-   CLAN TAG DISPLAY
-========================= */
 
-const _drawClanTag = draw;
-draw = function(){
-
-  _drawClanTag();
-
-  // Kendi tag
-  if(player.clan){
-    ctx.fillStyle="#fff";
-    ctx.fillText(
-      "["+player.clan+"]",
-      canvas.width/2-30,
-      canvas.height/2-40
-    );
-  }
-
-  // Remote tag
-  for(const id in remotePlayers){
-    const p = remotePlayers[id];
-
-    ctx.fillStyle="#fff";
-    ctx.fillText(
-      id,
-      canvas.width/2+(p.x-player.x)-20,
-      canvas.height/2+(p.y-player.y)-40
-    );
-  }
-};
 /* =========================
    GLOBAL LEADERBOARD
 ========================= */
