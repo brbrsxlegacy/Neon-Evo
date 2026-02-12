@@ -1,308 +1,2316 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>NEON RISE CLEAN</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>NEON RISE</title>
+
 <style>
-body { margin:0; background:#000; color:#0ff; overflow:hidden; font-family:Arial; }
-canvas { display:block; }
-#menu {
-position:fixed; inset:0;
-display:flex; flex-direction:column;
-align-items:center; justify-content:center;
-background:#000; z-index:10;
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #05060a;
+  overflow: hidden;
+  touch-action: none;
+  font-family: system-ui, sans-serif;
 }
-#hud { position:fixed; top:10px; left:10px; }
-button { margin:5px; padding:6px 10px; }
+
+canvas {
+  display: block;
+  background: radial-gradient(circle at center, #0b1020, #02030a);
+}
+
+/* Mobil joystick */
+#joystick {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(0,255,255,0.08);
+  border: 2px solid rgba(0,255,255,0.4);
+}
+
+#stick {
+  position: absolute;
+  left: 45px;
+  top: 45px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(0,255,255,0.9);
+}
 </style>
 </head>
+
 <body>
-
-<div id="menu">
-<h1>NEON RISE</h1>
-<button onclick="createRoom()">ODA OLUŞTUR</button>
-<button onclick="joinRoom()">ODAYA GİR</button>
-</div>
-
-<div id="hud"></div>
 <canvas id="game"></canvas>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<div id="joystick">
+  <div id="stick"></div>
+</div>
 
 <script>
-
 /* =========================
-   FIREBASE
+   CANVAS & GAME LOOP
 ========================= */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-const firebaseConfig = {
-apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
-authDomain: "pixelroom-ae218.firebaseapp.com",
-databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
-projectId: "pixelroom-ae218"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-/* =========================
-   CORE STATE
-========================= */
-
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
-const hud=document.getElementById("hud");
-
-function resize(){
-canvas.width=innerWidth;
-canvas.height=innerHeight;
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
+window.addEventListener("resize", resize);
 resize();
-addEventListener("resize",resize);
 
-let currentRoom=null;
-let playerId="p_"+Math.random().toString(36).substr(2,5);
-let myRef=null;
-let remotePlayers={};
+let lastTime = 0;
+function gameLoop(time) {
+  const delta = (time - lastTime) / 1000;
+  lastTime = time;
+  update(delta);
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
 
-let player={
-x:0,y:0,
-level:1,
-hp:100,
-maxHp:100,
-xp:0,
-xpToNext:100,
-speed:3,
-dashCooldown:0,
-dashing:0,
-spawnShield:0,
-inventory:[],
-equippedSkin:null,
-clan:null
+/* =========================
+   INPUT SYSTEM
+========================= */
+const keys = {};
+window.addEventListener("keydown", e => keys[e.key] = true);
+window.addEventListener("keyup", e => keys[e.key] = false);
+
+/* Mobil joystick */
+let joyX = 0, joyY = 0;
+const joystick = document.getElementById("joystick");
+const stick = document.getElementById("stick");
+let dragging = false;
+
+joystick.addEventListener("touchstart", e => dragging = true);
+window.addEventListener("touchend", () => {
+  dragging = false;
+  joyX = joyY = 0;
+  stick.style.left = "45px";
+  stick.style.top = "45px";
+});
+
+window.addEventListener("touchmove", e => {
+  if (!dragging) return;
+  const rect = joystick.getBoundingClientRect();
+  const touch = e.touches[0];
+  let x = touch.clientX - rect.left - 70;
+  let y = touch.clientY - rect.top - 70;
+  const dist = Math.hypot(x, y);
+  if (dist > 40) {
+    x = x / dist * 40;
+    y = y / dist * 40;
+  }
+  joyX = x / 40;
+  joyY = y / 40;
+  stick.style.left = 45 + x + "px";
+  stick.style.top = 45 + y + "px";
+});
+
+/* =========================
+   PLAYER
+========================= */
+const player = {
+  x: 0,
+  y: 0,
+  size: 18,
+  speed: 260
 };
 
-const skinPool=["#0ff","#f0f","#0f0","#ff0","#ff6600","#ffffff"];
+function update(dt) {
+  let dx = 0, dy = 0;
 
-/* =========================
-   ROOM
-========================= */
+  if (keys["w"] || keys["ArrowUp"]) dy -= 1;
+  if (keys["s"] || keys["ArrowDown"]) dy += 1;
+  if (keys["a"] || keys["ArrowLeft"]) dx -= 1;
+  if (keys["d"] || keys["ArrowRight"]) dx += 1;
 
-window.createRoom=function(){
-const room="room_"+Math.random().toString(36).substr(2,4);
-db.ref("rooms/"+room+"/meta").set({respawn:{x:0,y:0}});
-connect(room);
-}
+  dx += joyX;
+  dy += joyY;
 
-window.joinRoom=function(){
-db.ref("rooms").once("value").then(s=>{
-const rooms=s.val()||{};
-for(const r in rooms){
-const count=rooms[r].players?Object.keys(rooms[r].players).length:0;
-if(count<10){connect(r);return;}
-}
-alert("Boş oda yok");
-});
-}
+  const len = Math.hypot(dx, dy);
+  if (len > 0) {
+    dx /= len;
+    dy /= len;
+  }
 
-function connect(room){
-document.getElementById("menu").style.display="none";
-currentRoom=room;
-myRef=db.ref("rooms/"+room+"/players/"+playerId);
-myRef.set(player);
-myRef.onDisconnect().remove();
-db.ref("rooms/"+room+"/players").on("value",s=>{
-const data=s.val()||{};
-remotePlayers={};
-for(const id in data)
-if(id!==playerId) remotePlayers[id]=data[id];
-});
-}
-
-/* =========================
-   INPUT
-========================= */
-
-let keys={};
-onkeydown=e=>{
-keys[e.key]=true;
-if(e.key==="Shift") dash();
-};
-onkeyup=e=>keys[e.key]=false;
-
-/* =========================
-   SYSTEMS
-========================= */
-
-function dash(){
-if(player.dashCooldown>0)return;
-const p=120;
-if(keys["w"])player.y-=p;
-if(keys["s"])player.y+=p;
-if(keys["a"])player.x-=p;
-if(keys["d"])player.x+=p;
-player.dashing=0.2;
-player.dashCooldown=2;
-}
-
-function gainXP(a){
-player.xp+=a;
-if(player.xp>=player.xpToNext){
-player.level++;
-player.xp=0;
-}
-}
-
-function respawn(){
-player.hp=player.maxHp;
-player.spawnShield=3;
-}
-
-function dealDamage(id){
-const ref=db.ref("rooms/"+currentRoom+"/players/"+id);
-ref.transaction(data=>{
-if(!data)return;
-data.hp=(data.hp||100)-25;
-if(data.hp<=0){
-player.level+=data.level||1;
-data.level=1;
-data.hp=100;
-}
-return data;
-});
-}
-
-/* =========================
-   BOSS
-========================= */
-
-let boss=null;
-let bossTimer=0;
-
-function spawnBoss(){
-boss={x:player.x+300,y:player.y,hp:400,maxHp:400,size:40};
-}
-
-function updateBoss(){
-if(!boss)return;
-const dx=player.x-boss.x;
-const dy=player.y-boss.y;
-const d=Math.hypot(dx,dy);
-if(d>5){boss.x+=dx/d*1.2;boss.y+=dy/d*1.2;}
-if(d<50&&player.spawnShield<=0)player.hp-=0.4;
-}
-
-function damageBoss(){
-if(!boss)return;
-const d=Math.hypot(player.x-boss.x,player.y-boss.y);
-if(d<60){
-boss.hp-=20;
-if(boss.hp<=0){
-gainXP(50);
-player.inventory.push(skinPool[Math.floor(Math.random()*skinPool.length)]);
-boss=null;
-}
-}
-}
-
-/* =========================
-   UPDATE
-========================= */
-
-function update(){
-
-if(keys["w"])player.y-=player.speed;
-if(keys["s"])player.y+=player.speed;
-if(keys["a"])player.x-=player.speed;
-if(keys["d"])player.x+=player.speed;
-
-if(keys[" "]){
-for(const id in remotePlayers){
-const p=remotePlayers[id];
-if(Math.hypot(player.x-p.x,player.y-p.y)<40&&player.spawnShield<=0)
-dealDamage(id);
-}
-damageBoss();
-}
-
-if(player.hp<=0)respawn();
-
-if(player.spawnShield>0)player.spawnShield-=1/60;
-if(player.dashCooldown>0)player.dashCooldown-=1/60;
-if(player.dashing>0)player.dashing-=1/60;
-
-bossTimer+=1/60;
-if(!boss && Object.keys(remotePlayers).length+1>=3 && bossTimer>30){
-spawnBoss();
-bossTimer=0;
-}
-
-updateBoss();
-
-if(currentRoom)
-myRef.set(player);
-
-hud.innerHTML="HP:"+Math.floor(player.hp)+" | LV:"+player.level;
+  player.x += dx * player.speed * dt;
+  player.y += dy * player.speed * dt;
 }
 
 /* =========================
    DRAW
 ========================= */
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-function draw(){
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
 
-ctx.fillStyle="#050510";
-ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Grid
+  ctx.strokeStyle = "rgba(0,255,255,0.05)";
+  for (let x=-2000; x<2000; x+=60) {
+    ctx.beginPath();
+    ctx.moveTo(x, -2000);
+    ctx.lineTo(x, 2000);
+    ctx.stroke();
+  }
+  for (let y=-2000; y<2000; y+=60) {
+    ctx.beginPath();
+    ctx.moveTo(-2000, y);
+    ctx.lineTo(2000, y);
+    ctx.stroke();
+  }
 
-// grid
-ctx.strokeStyle="rgba(0,255,255,0.08)";
-for(let x=-(player.x%60);x<canvas.width;x+=60){
-ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();
-}
-for(let y=-(player.y%60);y<canvas.height;y+=60){
-ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();
-}
+  // Player glow
+  ctx.shadowBlur = 25;
+  ctx.shadowColor = "#00ffff";
+  ctx.fillStyle = "#00ffff";
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.size, 0, Math.PI*2);
+  ctx.fill();
 
-// player
-ctx.save();
-ctx.translate(canvas.width/2,canvas.height/2);
-ctx.shadowBlur=25;
-ctx.shadowColor=player.equippedSkin||"#0ff";
-ctx.fillStyle=player.equippedSkin||"#0ff";
-ctx.beginPath();ctx.arc(0,0,18,0,Math.PI*2);ctx.fill();
-ctx.restore();
-
-// remote
-for(const id in remotePlayers){
-const p=remotePlayers[id];
-ctx.save();
-ctx.translate(canvas.width/2+(p.x-player.x),canvas.height/2+(p.y-player.y));
-ctx.fillStyle="#f0f";
-ctx.beginPath();ctx.arc(0,0,15,0,Math.PI*2);ctx.fill();
-ctx.restore();
-}
-
-// boss
-if(boss){
-ctx.save();
-ctx.translate(canvas.width/2+(boss.x-player.x),canvas.height/2+(boss.y-player.y));
-ctx.fillStyle="#ff0000";
-ctx.beginPath();ctx.arc(0,0,boss.size,0,Math.PI*2);ctx.fill();
-ctx.restore();
-}
-
+  ctx.restore();
 }
 
 /* =========================
-   LOOP
+   ENEMY SYSTEM
 ========================= */
 
-function loop(){
-update();
-draw();
-requestAnimationFrame(loop);
+// Enemy listesi
+const enemies = [];
+
+// Enemy türleri
+const ENEMY_TYPES = {
+  MELEE: "melee",
+  RANGED: "ranged"
+};
+
+// Enemy oluşturucu
+function spawnEnemy(type = ENEMY_TYPES.MELEE) {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 600 + Math.random() * 400;
+
+  enemies.push({
+    type,
+    x: player.x + Math.cos(angle) * dist,
+    y: player.y + Math.sin(angle) * dist,
+    size: 16,
+    speed: type === ENEMY_TYPES.MELEE ? 140 : 90,
+    cooldown: 0
+  });
 }
-loop();
+
+// Spawn aralığı
+let enemySpawnTimer = 0;
+
+// Update içine ENTEGRE
+const _oldUpdate = update;
+update = function(dt) {
+  _oldUpdate(dt);
+
+  enemySpawnTimer -= dt;
+  if (enemySpawnTimer <= 0) {
+    spawnEnemy(Math.random() < 0.5 ? ENEMY_TYPES.MELEE : ENEMY_TYPES.RANGED);
+    enemySpawnTimer = 1.5;
+  }
+
+  enemies.forEach(e => {
+    const dx = player.x - e.x;
+    const dy = player.y - e.y;
+    const dist = Math.hypot(dx, dy) || 1;
+
+    if (e.type === ENEMY_TYPES.MELEE) {
+      // Yakın dövüş: direkt takip
+      e.x += (dx / dist) * e.speed * dt;
+      e.y += (dy / dist) * e.speed * dt;
+    } else {
+      // Uzak menzil: mesafe korur
+      if (dist > 220) {
+        e.x += (dx / dist) * e.speed * dt;
+        e.y += (dy / dist) * e.speed * dt;
+      }
+    }
+  });
+};
+
+// Draw içine ENTEGRE
+const _oldDraw = draw;
+draw = function() {
+  _oldDraw();
+
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+  enemies.forEach(e => {
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = e.type === ENEMY_TYPES.MELEE ? "#ff3355" : "#ffaa00";
+    ctx.fillStyle = e.type === ENEMY_TYPES.MELEE ? "#ff3355" : "#ffaa00";
+
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+};
+/* =========================
+   HEALTH & COLLISION SYSTEM
+========================= */
+
+// Oyuncu can sistemi
+player.maxHealth = 100;
+player.health = 100;
+player.invuln = 0; // hasar sonrası kısa dokunulmazlık
+
+// Basit çarpışma kontrolü (daire-daire)
+function circleHit(ax, ay, ar, bx, by, br) {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return Math.hypot(dx, dy) < ar + br;
+}
+
+// Update'e entegre
+const _update2 = update;
+update = function(dt) {
+  _update2(dt);
+
+  // Dokunulmazlık süresi
+  if (player.invuln > 0) player.invuln -= dt;
+
+  // Düşman-oyuncu çarpışması
+  enemies.forEach(e => {
+    if (circleHit(player.x, player.y, player.size, e.x, e.y, e.size)) {
+      if (player.invuln <= 0) {
+        player.health -= e.type === ENEMY_TYPES.MELEE ? 10 : 6;
+        player.invuln = 0.6;
+
+        // küçük geri itme
+        const dx = player.x - e.x;
+        const dy = player.y - e.y;
+        const d = Math.hypot(dx, dy) || 1;
+        player.x += (dx / d) * 18;
+        player.y += (dy / d) * 18;
+
+        // Ölüm kontrolü
+        if (player.health <= 0) {
+          player.health = player.maxHealth;
+          player.x = 0;
+          player.y = 0;
+          enemies.length = 0; // sahneyi temizle
+        }
+      }
+    }
+  });
+};
+
+// Draw'e HUD ekle
+const _draw2 = draw;
+draw = function() {
+  _draw2();
+
+  // HUD (ekran sabit)
+  const pad = 16;
+  const w = 220, h = 14;
+  const ratio = Math.max(0, player.health / player.maxHealth);
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(pad, pad, w, h);
+
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = "#00ff99";
+  ctx.fillStyle = "#00ff99";
+  ctx.fillRect(pad, pad, w * ratio, h);
+  ctx.restore();
+};
+/* =========================
+   XP & LEVEL SYSTEM
+========================= */
+
+// Oyuncu seviye verileri
+player.level = 1;
+player.xp = 0;
+player.xpToNext = 100;
+
+// Aura (geçici otomatik hasar)
+player.auraRadius = 34;
+player.auraDps = 30; // saniyede hasar
+
+// Düşmanlara can ekle (mevcut olanlara da uygula)
+function initEnemyHealth(e) {
+  if (e.maxHealth == null) {
+    e.maxHealth = e.type === ENEMY_TYPES.MELEE ? 40 : 30;
+    e.health = e.maxHealth;
+  }
+}
+
+// Level atlama
+function levelUp() {
+  player.level++;
+  player.xp = 0;
+  player.xpToNext = Math.floor(player.xpToNext * 1.35);
+
+  // küçük güçlenme
+  player.speed += 20;
+  player.maxHealth += 10;
+  player.health = player.maxHealth;
+
+  // aura biraz büyür
+  player.auraRadius += 3;
+  player.auraDps += 5;
+
+  // görsel minik patlama
+  screenShake.time = 0.25;
+}
+
+// Screen shake altyapısı (hafif)
+const screenShake = { time: 0, strength: 6 };
+
+// Update’e entegre
+const _update3 = update;
+update = function(dt) {
+  _update3(dt);
+
+  // Screen shake süresi
+  if (screenShake.time > 0) screenShake.time -= dt;
+
+  // Düşmanlara aura hasarı
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    initEnemyHealth(e);
+
+    const dx = player.x - e.x;
+    const dy = player.y - e.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < player.auraRadius) {
+      e.health -= player.auraDps * dt;
+
+      if (e.health <= 0) {
+        // XP kazan
+        player.xp += e.type === ENEMY_TYPES.MELEE ? 20 : 15;
+        enemies.splice(i, 1);
+
+        // küçük sarsıntı
+        screenShake.time = 0.12;
+
+        if (player.xp >= player.xpToNext) {
+          levelUp();
+        }
+      }
+    }
+  }
+};
+
+// Draw’e XP HUD + aura görseli
+const _draw3 = draw;
+draw = function() {
+  // screen shake uygula
+  let sx = 0, sy = 0;
+  if (screenShake.time > 0) {
+    sx = (Math.random() - 0.5) * screenShake.strength;
+    sy = (Math.random() - 0.5) * screenShake.strength;
+  }
+  ctx.save();
+  ctx.translate(sx, sy);
+  _draw3();
+  ctx.restore();
+
+  // Aura görseli
+  ctx.save();
+  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.globalAlpha = 0.15;
+  ctx.strokeStyle = "#00ffff";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, player.auraRadius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // XP bar
+  const pad = 16;
+  const w = 220, h = 10;
+  const ratio = Math.min(1, player.xp / player.xpToNext);
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(pad, pad + 22, w, h);
+
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = "#6cf";
+  ctx.fillStyle = "#6cf";
+  ctx.fillRect(pad, pad + 22, w * ratio, h);
+
+  // Level yazısı
+  ctx.fillStyle = "#eaf2ff";
+  ctx.font = "12px system-ui";
+  ctx.fillText("LV " + player.level, pad + w + 10, pad + 32);
+  ctx.restore();
+};
+/* =========================
+   DRAW PIPELINE FIX
+   (BLACK SCREEN HOTFIX)
+========================= */
+
+// Draw zincirini güvenli hale al
+let __safeDraw = draw;
+
+draw = function () {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // screen shake varsa uygula
+  let sx = 0, sy = 0;
+  if (typeof screenShake !== "undefined" && screenShake.time > 0) {
+    sx = (Math.random() - 0.5) * screenShake.strength;
+    sy = (Math.random() - 0.5) * screenShake.strength;
+  }
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  __safeDraw();
+  ctx.restore();
+};
+/* =========================
+   ATTACK SYSTEM (MELEE + RANGED)
+========================= */
+
+// ---- INPUT (klavye + mobil) ----
+const attackInput = {
+  melee: false,
+  ranged: false
+};
+
+// Klavye
+window.addEventListener("keydown", e => {
+  if (e.code === "Space") attackInput.melee = true;
+  if (e.key === "f" || e.key === "F") attackInput.ranged = true;
+});
+window.addEventListener("keyup", e => {
+  if (e.code === "Space") attackInput.melee = false;
+  if (e.key === "f" || e.key === "F") attackInput.ranged = false;
+});
+
+// Mobil butonlar
+const btnWrap = document.createElement("div");
+btnWrap.style.cssText = `
+  position:fixed; right:20px; bottom:20px; display:flex; gap:12px; z-index:9;
+`;
+document.body.appendChild(btnWrap);
+
+function mkBtn(txt){
+  const b = document.createElement("button");
+  b.textContent = txt;
+  b.style.cssText = `
+    width:64px;height:64px;border-radius:50%;
+    background:rgba(0,255,255,.15); color:#eaf2ff;
+    border:2px solid rgba(0,255,255,.6); font-size:12px;
+  `;
+  btnWrap.appendChild(b);
+  return b;
+}
+const meleeBtn = mkBtn("MELEE");
+const rangedBtn = mkBtn("SHOT");
+
+meleeBtn.addEventListener("touchstart", ()=>attackInput.melee=true);
+meleeBtn.addEventListener("touchend", ()=>attackInput.melee=false);
+rangedBtn.addEventListener("touchstart", ()=>attackInput.ranged=true);
+rangedBtn.addEventListener("touchend", ()=>attackInput.ranged=false);
+
+// ---- MELEE ----
+player.melee = {
+  range: 42,
+  damage: 18,
+  cooldown: 0,
+  cdTime: 0.35
+};
+
+// ---- PROJECTILES ----
+const bullets = [];
+player.ranged = {
+  speed: 520,
+  damage: 14,
+  cooldown: 0,
+  cdTime: 0.25
+};
+
+function shootBullet(){
+  // hedef: en yakın düşman yönü, yoksa ileri
+  let tx = 1, ty = 0, best = Infinity;
+  enemies.forEach(e=>{
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    const d = Math.hypot(dx,dy);
+    if (d < best){ best = d; tx = dx/d; ty = dy/d; }
+  });
+  bullets.push({
+    x: player.x, y: player.y,
+    vx: tx * player.ranged.speed,
+    vy: ty * player.ranged.speed,
+    r: 4
+  });
+}
+
+// ---- UPDATE ENTEGRASYONU ----
+const _update4 = update;
+update = function(dt){
+  _update4(dt);
+
+  // cooldownlar
+  if (player.melee.cooldown > 0) player.melee.cooldown -= dt;
+  if (player.ranged.cooldown > 0) player.ranged.cooldown -= dt;
+
+  // MELEE saldırı
+  if (attackInput.melee && player.melee.cooldown <= 0){
+    player.melee.cooldown = player.melee.cdTime;
+    enemies.forEach(e=>{
+      initEnemyHealth(e);
+      const d = Math.hypot(e.x - player.x, e.y - player.y);
+      if (d <= player.melee.range){
+        e.health -= player.melee.damage;
+        screenShake.time = 0.1;
+      }
+    });
+  }
+
+  // RANGED saldırı
+  if (attackInput.ranged && player.ranged.cooldown <= 0){
+    player.ranged.cooldown = player.ranged.cdTime;
+    shootBullet();
+  }
+
+  // Bullet update + çarpışma
+  for (let i = bullets.length-1; i>=0; i--){
+    const b = bullets[i];
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+
+    // menzil dışı
+    if (Math.hypot(b.x-player.x, b.y-player.y) > 900){
+      bullets.splice(i,1); continue;
+    }
+
+    // düşman çarpışması
+    for (let j = enemies.length-1; j>=0; j--){
+      const e = enemies[j];
+      initEnemyHealth(e);
+      if (circleHit(b.x,b.y,b.r, e.x,e.y,e.size)){
+        e.health -= player.ranged.damage;
+        bullets.splice(i,1);
+        screenShake.time = 0.08;
+        if (e.health <= 0){
+          player.xp += e.type === ENEMY_TYPES.MELEE ? 20 : 15;
+          enemies.splice(j,1);
+          if (player.xp >= player.xpToNext) levelUp();
+        }
+        break;
+      }
+    }
+  }
+};
+
+// ---- DRAW ENTEGRASYONU ----
+const _draw4 = draw;
+draw = function(){
+  _draw4();
+
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+  // melee alanı
+  if (player.melee.cooldown > player.melee.cdTime - 0.08){
+    ctx.globalAlpha = 0.2;
+    ctx.strokeStyle = "#00ffff";
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.melee.range, 0, Math.PI*2);
+    ctx.stroke();
+  }
+
+  // mermiler
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#6cf";
+  bullets.forEach(b=>{
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+};
+/* =========================
+   VISUAL EFFECTS & POLISH
+========================= */
+
+// ---- PARTICLES ----
+const particles = [];
+
+function spawnParticles(x, y, color="#00ffff", count=10){
+  for (let i=0;i<count;i++){
+    particles.push({
+      x, y,
+      vx: (Math.random()-0.5)*260,
+      vy: (Math.random()-0.5)*260,
+      life: 0.4 + Math.random()*0.3,
+      r: 2 + Math.random()*2,
+      color
+    });
+  }
+}
+
+// ---- HIT FLASH ----
+function hitFlash(e){
+  e._flash = 0.1;
+}
+
+// ---- UPDATE ENTEGRASYONU ----
+const _update5 = update;
+update = function(dt){
+  _update5(dt);
+
+  // Particle update
+  for (let i = particles.length-1; i>=0; i--){
+    const p = particles[i];
+    p.life -= dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= 0.96;
+    p.vy *= 0.96;
+    if (p.life <= 0) particles.splice(i,1);
+  }
+
+  // Enemy flash timer
+  enemies.forEach(e=>{
+    if (e._flash > 0) e._flash -= dt;
+  });
+};
+
+// ---- DÜŞMAN ÖLÜMÜNE PARTİKÜL BAĞLA ----
+const _killXP = levelUp;
+levelUp = function(){
+  spawnParticles(player.x, player.y, "#6cf", 18);
+  _killXP();
+};
+
+// Mermi ve melee vuruşlarında efekt
+const _shootBulletFx = shootBullet;
+shootBullet = function(){
+  _shootBulletFx();
+  spawnParticles(player.x, player.y, "#6cf", 6);
+};
+
+// ---- DRAW ENTEGRASYONU ----
+const _draw5 = draw;
+draw = function(){
+  _draw5();
+
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+  // Particles
+  particles.forEach(p=>{
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+};
+/* =========================
+   CHARACTER EVOLUTION
+========================= */
+
+// Evrim aşamaları
+const EVOLUTIONS = [
+  { lvl: 1,  size: 18, glow: 18, color: "#00ffff", auraMul: 1.0 },
+  { lvl: 4,  size: 20, glow: 22, color: "#6cf",    auraMul: 1.1 },
+  { lvl: 8,  size: 22, glow: 26, color: "#9f6cff", auraMul: 1.2 },
+  { lvl: 12, size: 24, glow: 30, color: "#ff6cf0", auraMul: 1.35 }
+];
+
+player.evoIndex = 0;
+
+// Evrimi uygula
+function applyEvolution() {
+  let idx = 0;
+  for (let i = 0; i < EVOLUTIONS.length; i++) {
+    if (player.level >= EVOLUTIONS[i].lvl) idx = i;
+  }
+  if (idx !== player.evoIndex) {
+    player.evoIndex = idx;
+    const e = EVOLUTIONS[idx];
+
+    player.size = e.size;
+    player._evoColor = e.color;
+    player._evoGlow = e.glow;
+
+    // Aura güçlendirme
+    player.auraRadius = Math.floor(player.auraRadius * e.auraMul);
+
+    // Görsel geri bildirim
+    spawnParticles(player.x, player.y, e.color, 28);
+    screenShake.time = 0.2;
+  }
+}
+
+// LevelUp’a bağla
+const _levelUpEvo = levelUp;
+levelUp = function () {
+  _levelUpEvo();
+  applyEvolution();
+};
+
+// Oyun başında da uygula
+applyEvolution();
+
+// ---- DRAW EVOLUTION ----
+const _draw6 = draw;
+draw = function () {
+  _draw6();
+
+  ctx.save();
+  ctx.translate(canvas.width / 2 - player.x, canvas.height / 2 - player.y);
+
+  // Player glow + core
+  ctx.shadowBlur = player._evoGlow || 18;
+  ctx.shadowColor = player._evoColor || "#00ffff";
+  ctx.fillStyle = player._evoColor || "#00ffff";
+
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+};
+/* =========================
+   EVOLUTION 0–100 + COSMETICS + SHOP
+========================= */
+
+/* ---- EVOLUTION DATA (0–100) ---- */
+player.appearance = {
+  color: "#00ffff",
+  glow: 18,
+  outfit: "none"
+};
+
+function getEvolutionByLevel(lv){
+  return {
+    size: 18 + Math.floor(lv / 5),              // her 5 level büyür
+    glow: 18 + Math.floor(lv / 4),
+    color: `hsl(${(lv*3)%360}, 80%, 60%)`        // levela göre renk
+  };
+}
+
+/* ---- OVERRIDE DRAW (PLAYER TEK NOKTA) ---- */
+const _drawFinal = draw;
+draw = function(){
+  _drawFinal();
+
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+  const evo = getEvolutionByLevel(player.level);
+
+  // Aura
+  ctx.globalAlpha = 0.15;
+  ctx.strokeStyle = evo.color;
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.auraRadius, 0, Math.PI*2);
+  ctx.stroke();
+
+  // Player
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = evo.glow;
+  ctx.shadowColor = evo.color;
+  ctx.fillStyle = evo.color;
+
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, evo.size, 0, Math.PI*2);
+  ctx.fill();
+
+  // Outfit (basit görsel temsil)
+  if (player.appearance.outfit !== "none"){
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y+4, evo.size-4, 0, Math.PI);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+};
+
+/* ---- MARKET DATA ---- */
+player.coins = 0;
+const SHOP_ITEMS = [
+  { id:"hoodie", name:"Neon Hoodie", price:150 },
+  { id:"jacket", name:"Cyber Jacket", price:300 },
+  { id:"aura+",  name:"Aura Booster", price:200 }
+];
+
+/* ---- XP'DEN COIN ---- */
+const _xpCoin = levelUp;
+levelUp = function(){
+  _xpCoin();
+  player.coins += 25;
+};
+
+/* ---- SHOP UI ---- */
+const shopBtn = document.createElement("button");
+shopBtn.textContent = "SHOP";
+shopBtn.style.cssText = `
+  position:fixed; top:12px; right:12px;
+  background:#0ff2; color:#eaf2ff;
+  border:1px solid #0ff;
+  padding:6px 10px;
+`;
+document.body.appendChild(shopBtn);
+
+const shopPanel = document.createElement("div");
+shopPanel.style.cssText = `
+  position:fixed; inset:20%;
+  background:#02030a;
+  border:2px solid #0ff;
+  color:#eaf2ff;
+  padding:12px;
+  display:none;
+`;
+document.body.appendChild(shopPanel);
+
+shopBtn.onclick = ()=>{
+  shopPanel.style.display = shopPanel.style.display==="none"?"block":"none";
+  renderShop();
+};
+
+function renderShop(){
+  shopPanel.innerHTML = `<b>COINS:</b> ${player.coins}<hr>`;
+  SHOP_ITEMS.forEach(it=>{
+    const b = document.createElement("button");
+    b.textContent = `${it.name} (${it.price})`;
+    b.style.display="block";
+    b.onclick = ()=>{
+      if (player.coins >= it.price){
+        player.coins -= it.price;
+        if (it.id==="aura+") player.auraRadius += 6;
+        else player.appearance.outfit = it.id;
+        renderShop();
+      }
+    };
+    shopPanel.appendChild(b);
+  });
+}
+/* =========================
+   ADMIN + CREATOR + ADVANCED SHOP
+========================= */
+
+/* ---- ADMIN ---- */
+const ADMIN_CODE = "sus304";
+player.isAdmin = false;
+
+// Coini uçur 😈
+player.coins = 10000000000;
+
+/* ---- SHOP ITEMS (50 ADET) ---- */
+const SHOP_ITEMS_ADV = [];
+for (let i = 1; i <= 50; i++) {
+  SHOP_ITEMS_ADV.push({
+    id: "item" + i,
+    name: "Neon Item " + i,
+    price: i * 100,
+    color: `hsl(${i * 7 % 360},80%,60%)`,
+    type: i % 5 === 0 ? "aura" : "outfit"
+  });
+}
+
+/* ---- SHOP UI GÜNCELLE ---- */
+shopPanel.style.inset = "10%";
+shopPanel.style.overflow = "auto";
+
+/* ---- ADMIN + CREATOR PANEL ---- */
+const adminBtn = document.createElement("button");
+adminBtn.textContent = "ADMIN / CREATOR";
+adminBtn.style.cssText = `
+  position:fixed; top:52px; right:12px;
+  background:#ff00552a; color:#fff;
+  border:1px solid #ff3355;
+  padding:6px 10px;
+`;
+document.body.appendChild(adminBtn);
+
+const adminPanel = document.createElement("div");
+adminPanel.style.cssText = `
+  position:fixed; inset:15%;
+  background:#02030a;
+  border:2px solid #ff3355;
+  color:#fff;
+  padding:12px;
+  display:none;
+`;
+document.body.appendChild(adminPanel);
+
+adminBtn.onclick = () => {
+  adminPanel.style.display = adminPanel.style.display === "none" ? "block" : "none";
+  renderAdmin();
+};
+
+function renderAdmin() {
+  adminPanel.innerHTML = `
+    <h3>ADMIN / CREATOR PANEL</h3>
+    <input id="adminCode" placeholder="Admin Code">
+    <button id="enterAdmin">GİR</button>
+    <hr>
+    <div id="creatorArea" style="display:${player.isAdmin ? "block":"none"}">
+      <h4>İçerik Üretici Alanı</h4>
+      <input id="newItemName" placeholder="Ürün adı">
+      <input id="newItemColor" placeholder="Renk (red / #fff / hsl)">
+      <input id="newItemPrice" placeholder="Fiyat">
+      <button id="addItem">Ürün Ekle</button>
+    </div>
+  `;
+
+  document.getElementById("enterAdmin").onclick = () => {
+    const code = document.getElementById("adminCode").value;
+    if (code === ADMIN_CODE) {
+      player.isAdmin = true;
+      alert("ADMIN AKTİF 🔥");
+      renderAdmin();
+    }
+  };
+
+  if (player.isAdmin) {
+    document.getElementById("addItem").onclick = () => {
+      SHOP_ITEMS_ADV.push({
+        id: "custom" + Date.now(),
+        name: document.getElementById("newItemName").value || "Custom",
+        price: parseInt(document.getElementById("newItemPrice").value) || 0,
+        color: document.getElementById("newItemColor").value || "#0ff",
+        type: "outfit"
+      });
+      alert("Ürün eklendi");
+      renderShopAdvanced();
+    };
+  }
+}
+
+/* ---- ADVANCED SHOP RENDER ---- */
+function renderShopAdvanced() {
+  shopPanel.innerHTML = `<b>COINS:</b> ${player.coins}<hr>`;
+  shopPanel.style.display = "grid";
+  shopPanel.style.gridTemplateColumns = "repeat(auto-fill, minmax(120px,1fr))";
+  shopPanel.style.gap = "10px";
+
+  SHOP_ITEMS_ADV.forEach(it => {
+    const card = document.createElement("div");
+    card.style.cssText = `
+      border:1px solid ${it.color};
+      padding:8px;
+      text-align:center;
+      cursor:pointer;
+      background:#000;
+    `;
+    card.innerHTML = `
+      <div style="
+        width:60px;height:60px;
+        margin:0 auto 6px;
+        background:${it.color};
+        border-radius:50%;
+        box-shadow:0 0 12px ${it.color};
+      "></div>
+      <div>${it.name}</div>
+      <small>${it.price}</small>
+    `;
+    card.onclick = () => {
+      if (player.coins >= it.price) {
+        player.coins -= it.price;
+        if (it.type === "aura") player.auraRadius += 4;
+        else player.appearance.outfit = it.id;
+        renderShopAdvanced();
+      }
+    };
+    shopPanel.appendChild(card);
+  });
+}
+
+/* ---- SHOP BUTTON OVERRIDE ---- */
+shopBtn.onclick = () => {
+  shopPanel.style.display = shopPanel.style.display === "none" ? "grid" : "none";
+  renderShopAdvanced();
+};
+/* =========================
+   SHOP CLOSE (X BUTTON)
+========================= */
+
+// X butonu oluştur (tek sefer)
+const shopCloseBtn = document.createElement("div");
+shopCloseBtn.textContent = "✕";
+shopCloseBtn.style.cssText = `
+  position:fixed;
+  top:14px; right:14px;
+  width:32px; height:32px;
+  display:flex; align-items:center; justify-content:center;
+  background:#000;
+  color:#fff;
+  border:1px solid #0ff;
+  border-radius:6px;
+  cursor:pointer;
+  z-index:9999;
+  box-shadow:0 0 10px #0ff;
+`;
+shopCloseBtn.style.display = "none";
+document.body.appendChild(shopCloseBtn);
+
+// X tıklanınca marketi kapat
+shopCloseBtn.onclick = () => {
+  shopPanel.style.display = "none";
+  shopCloseBtn.style.display = "none";
+};
+
+// Market açıldığında X'i göster
+const _shopBtnClick = shopBtn.onclick;
+shopBtn.onclick = () => {
+  _shopBtnClick();
+  const open = shopPanel.style.display !== "none";
+  shopCloseBtn.style.display = open ? "flex" : "none";
+};
+
+// Admin/Creator paneli açılırsa X gizle (karışmasın)
+const _adminBtnClick = adminBtn.onclick;
+adminBtn.onclick = () => {
+  _adminBtnClick();
+  shopCloseBtn.style.display = "none";
+};
+/* =========================
+   SAVE / LOAD (localStorage)
+========================= */
+
+const SAVE_KEY = "NEON_RISE_SAVE_V1";
+
+// Kaydedilecek veriyi hazırla
+function buildSaveData() {
+  return {
+    player: {
+      x: player.x,
+      y: player.y,
+      level: player.level,
+      xp: player.xp,
+      xpToNext: player.xpToNext,
+      maxHealth: player.maxHealth,
+      health: player.health,
+      speed: player.speed,
+      auraRadius: player.auraRadius,
+      coins: player.coins,
+      appearance: player.appearance,
+      isAdmin: player.isAdmin
+    },
+    shop: {
+      items: SHOP_ITEMS_ADV // admin ekledikleri dahil
+    },
+    time: Date.now()
+  };
+}
+
+// Kaydet
+function saveGame() {
+  try {
+    const data = buildSaveData();
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    toast("Kaydedildi 💾");
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Yükle
+function loadGame() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+
+    Object.assign(player, data.player);
+    if (data.shop && data.shop.items) {
+      SHOP_ITEMS_ADV.length = 0;
+      data.shop.items.forEach(it => SHOP_ITEMS_ADV.push(it));
+    }
+    applyEvolution(); // evrimi yeniden uygula
+    toast("Yüklendi ✅");
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Otomatik yükle
+loadGame();
+
+// Otomatik kaydet (30 sn)
+setInterval(saveGame, 30000);
+
+// Sekme kapanırken kaydet
+window.addEventListener("beforeunload", saveGame);
+
+// ---- Basit Toast Bildirimi ----
+const toastEl = document.createElement("div");
+toastEl.style.cssText = `
+  position:fixed; left:50%; bottom:20px; transform:translateX(-50%);
+  background:#000; color:#0ff; padding:8px 14px;
+  border:1px solid #0ff; border-radius:8px;
+  box-shadow:0 0 12px #0ff; z-index:9999;
+  opacity:0; transition:opacity .2s;
+`;
+document.body.appendChild(toastEl);
+
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.style.opacity = 1;
+  setTimeout(()=>toastEl.style.opacity = 0, 1200);
+}
+
+// ---- Manuel Kaydet/Yükle Butonları ----
+const saveBtn = document.createElement("button");
+saveBtn.textContent = "SAVE";
+saveBtn.style.cssText = `
+  position:fixed; left:12px; bottom:12px;
+  background:#0ff2; color:#eaf2ff;
+  border:1px solid #0ff; padding:6px 10px;
+`;
+document.body.appendChild(saveBtn);
+saveBtn.onclick = saveGame;
+
+const loadBtn = document.createElement("button");
+loadBtn.textContent = "LOAD";
+loadBtn.style.cssText = `
+  position:fixed; left:72px; bottom:12px;
+  background:#0ff2; color:#eaf2ff;
+  border:1px solid #0ff; padding:6px 10px;
+`;
+document.body.appendChild(loadBtn);
+loadBtn.onclick = loadGame;
+/* =========================
+   SOUND & MUSIC SYSTEM
+========================= */
+
+// ---- SES AYARLARI ----
+const soundSettings = {
+  sfx: true,
+  music: true,
+  volume: 0.6
+};
+
+// ---- AUDIO CONTEXT ----
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioCtx();
+
+// Basit beep üretici (dosya gerekmez)
+function playBeep(freq=440, dur=0.08, type="sine", vol=0.5){
+  if (!soundSettings.sfx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.value = vol * soundSettings.volume;
+  o.connect(g).connect(audioCtx.destination);
+  o.start();
+  o.stop(audioCtx.currentTime + dur);
+}
+
+// ---- SFX BAĞLANTILARI ----
+const _meleeSfx = player.melee;
+const _shootSfx = shootBullet;
+shootBullet = function(){
+  playBeep(820, 0.05, "square", 0.4);
+  _shootSfx();
+};
+
+const _levelUpSfx = levelUp;
+levelUp = function(){
+  playBeep(520, 0.12, "sawtooth", 0.6);
+  playBeep(780, 0.14, "sawtooth", 0.6);
+  _levelUpSfx();
+};
+
+// Düşman hasarı için kısa klik
+const _hitFlashSfx = hitFlash;
+hitFlash = function(e){
+  playBeep(220, 0.04, "triangle", 0.3);
+  _hitFlashSfx(e);
+};
+
+// ---- ARKA PLAN MÜZİĞİ (LOOP) ----
+let musicOsc = null;
+
+function startMusic(){
+  if (!soundSettings.music || musicOsc) return;
+  musicOsc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  musicOsc.type = "sine";
+  musicOsc.frequency.value = 110;
+  g.gain.value = 0.08 * soundSettings.volume;
+  musicOsc.connect(g).connect(audioCtx.destination);
+  musicOsc.start();
+}
+
+function stopMusic(){
+  if (musicOsc){
+    musicOsc.stop();
+    musicOsc = null;
+  }
+}
+
+// İlk etkileşimde müziği başlat (tarayıcı kuralı)
+window.addEventListener("pointerdown", startMusic, { once:true });
+
+// ---- AYAR MENÜSÜ ----
+const settingsBtn = document.createElement("button");
+settingsBtn.textContent = "SETTINGS";
+settingsBtn.style.cssText = `
+  position:fixed; top:12px; left:12px;
+  background:#0ff2; color:#eaf2ff;
+  border:1px solid #0ff; padding:6px 10px;
+`;
+document.body.appendChild(settingsBtn);
+
+const settingsPanel = document.createElement("div");
+settingsPanel.style.cssText = `
+  position:fixed; inset:30%;
+  background:#02030a;
+  border:2px solid #0ff;
+  color:#eaf2ff;
+  padding:12px;
+  display:none;
+`;
+document.body.appendChild(settingsPanel);
+
+settingsBtn.onclick = ()=>{
+  settingsPanel.style.display = settingsPanel.style.display==="none"?"block":"none";
+  renderSettings();
+};
+
+function renderSettings(){
+  settingsPanel.innerHTML = `
+    <h3>AYARLAR</h3>
+    <label>
+      <input type="checkbox" id="sfxChk" ${soundSettings.sfx?"checked":""}>
+      Ses Efektleri
+    </label><br><br>
+    <label>
+      <input type="checkbox" id="musicChk" ${soundSettings.music?"checked":""}>
+      Müzik
+    </label><br><br>
+    <label>
+      Ses Seviyesi
+      <input type="range" id="volRange" min="0" max="1" step="0.05" value="${soundSettings.volume}">
+    </label>
+  `;
+
+  document.getElementById("sfxChk").onchange = e=>{
+    soundSettings.sfx = e.target.checked;
+  };
+  document.getElementById("musicChk").onchange = e=>{
+    soundSettings.music = e.target.checked;
+    if (soundSettings.music) startMusic();
+    else stopMusic();
+  };
+  document.getElementById("volRange").oninput = e=>{
+    soundSettings.volume = parseFloat(e.target.value);
+  };
+}
+/* =========================
+   BACKGROUND MUSIC FIX (REAL LOOP)
+========================= */
+
+// Gerçek müzik objesi
+let bgMusic = new Audio();
+bgMusic.loop = true;
+bgMusic.volume = 0.4 * soundSettings.volume;
+
+// Telifsiz, data-uri synth müzik (harici dosya gerekmez)
+bgMusic.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+
+// İlk kullanıcı etkileşiminde başlat
+function tryStartMusic(){
+  if (!soundSettings.music) return;
+  bgMusic.volume = 0.4 * soundSettings.volume;
+  bgMusic.play().catch(()=>{});
+}
+
+// Her tıklama/dokunuşta dene (1 kere çalınca bırakır)
+window.addEventListener("pointerdown", tryStartMusic);
+window.addEventListener("keydown", tryStartMusic);
+
+// Ayarlardan kontrol
+const _musicToggleFix = renderSettings;
+renderSettings = function(){
+  _musicToggleFix();
+
+  const musicChk = document.getElementById("musicChk");
+  if (musicChk){
+    musicChk.onchange = e=>{
+      soundSettings.music = e.target.checked;
+      if (soundSettings.music) tryStartMusic();
+      else bgMusic.pause();
+    };
+  }
+
+  const volRange = document.getElementById("volRange");
+  if (volRange){
+    volRange.oninput = e=>{
+      soundSettings.volume = parseFloat(e.target.value);
+      bgMusic.volume = 0.4 * soundSettings.volume;
+    };
+  }
+};
+/* =========================
+   ONLINE LEADERBOARD (FIREBASE)
+========================= */
+
+// Firebase SDK ekle
+const fbScript1 = document.createElement("script");
+fbScript1.src = "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+document.head.appendChild(fbScript1);
+
+const fbScript2 = document.createElement("script");
+fbScript2.src = "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+document.head.appendChild(fbScript2);
+
+setTimeout(() => {
+
+  const firebaseConfig = {
+    apiKey: "BURAYA_API_KEY",
+    authDomain: "BURAYA_AUTH_DOMAIN",
+    databaseURL: "BURAYA_DATABASE_URL",
+    projectId: "BURAYA_PROJECT_ID",
+    storageBucket: "BURAYA_STORAGE",
+    messagingSenderId: "BURAYA_ID",
+    appId: "BURAYA_APP_ID"
+  };
+
+  const app = firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+
+  // İsim sor
+  let playerName = localStorage.getItem("playerName");
+  if (!playerName) {
+    playerName = prompt("İsmini gir:");
+    localStorage.setItem("playerName", playerName);
+  }
+
+  function submitScore() {
+    database.ref("leaderboard/" + playerName).set({
+      level: player.level,
+      coins: player.coins,
+      time: Date.now()
+    });
+  }
+
+  // 30 saniyede bir score gönder
+  setInterval(submitScore, 30000);
+
+  // Leaderboard UI
+  const lbPanel = document.createElement("div");
+  lbPanel.style.cssText = `
+    position:fixed;
+    left:12px;
+    top:80px;
+    background:#000;
+    color:#0ff;
+    border:1px solid #0ff;
+    padding:8px;
+    max-height:300px;
+    overflow:auto;
+    font-size:12px;
+  `;
+  document.body.appendChild(lbPanel);
+
+  database.ref("leaderboard").on("value", snapshot => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    const arr = Object.entries(data)
+      .sort((a,b) => b[1].level - a[1].level)
+      .slice(0,10);
+
+    lbPanel.innerHTML = "<b>🏆 LEADERBOARD</b><hr>";
+    arr.forEach((p,i) => {
+      lbPanel.innerHTML += `
+        ${i+1}. ${p[0]} - Lv ${p[1].level}<br>
+      `;
+    });
+  });
+
+}, 1000);
+/* =========================
+   FIREBASE ONLINE LEADERBOARD (MODERN v10)
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js").then(appModule => {
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
+
+  const { initializeApp } = appModule;
+  const { getDatabase, ref, set, onValue } = dbModule;
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
+    authDomain: "pixelroom-ae218.firebaseapp.com",
+    databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "pixelroom-ae218",
+    storageBucket: "pixelroom-ae218.firebasestorage.app",
+    messagingSenderId: "720297722320",
+    appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const database = getDatabase(app);
+
+  let playerName = localStorage.getItem("playerName");
+  if (!playerName) {
+    playerName = prompt("İsmini gir:");
+    localStorage.setItem("playerName", playerName);
+  }
+
+  function submitScore() {
+    set(ref(database, "leaderboard/" + playerName), {
+      level: player.level,
+      coins: player.coins,
+      timestamp: Date.now()
+    });
+  }
+
+  setInterval(submitScore, 30000);
+
+  const lbPanel = document.createElement("div");
+  lbPanel.style.cssText = `
+    position:fixed;
+    left:12px;
+    top:80px;
+    background:#000;
+    color:#0ff;
+    border:1px solid #0ff;
+    padding:8px;
+    max-height:300px;
+    overflow:auto;
+    font-size:12px;
+  `;
+  document.body.appendChild(lbPanel);
+
+  onValue(ref(database, "leaderboard"), snapshot => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    const arr = Object.entries(data)
+      .sort((a,b) => b[1].level - a[1].level)
+      .slice(0,10);
+
+    lbPanel.innerHTML = "<b>🏆 ONLINE LEADERBOARD</b><hr>";
+    arr.forEach((p,i) => {
+      lbPanel.innerHTML += `${i+1}. ${p[0]} - Lv ${p[1].level}<br>`;
+    });
+  });
+
+});
+});
+
+/* =========================
+   ONLINE WORLD (ROOM SYSTEM - MAX 10)
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js").then(appModule=>{
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
+
+const { initializeApp } = appModule;
+const { getDatabase, ref, set, onValue, remove, onDisconnect, get, child } = dbModule;
+
+const firebaseConfig = {
+  apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
+  authDomain: "pixelroom-ae218.firebaseapp.com",
+  databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "pixelroom-ae218",
+  storageBucket: "pixelroom-ae218.firebasestorage.app",
+  messagingSenderId: "720297722320",
+  appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const ROOM = "world1";
+const playerId = "p_" + Math.random().toString(36).substr(2,9);
+
+const playersRef = ref(db, "rooms/"+ROOM+"/players");
+
+// ---- MAX 10 KONTROL ----
+get(playersRef).then(snapshot=>{
+  const data = snapshot.val();
+  const count = data ? Object.keys(data).length : 0;
+  if (count >= 10){
+    alert("Oda dolu (10/10)");
+    return;
+  }
+
+  // Oyuncuyu ekle
+  const myRef = ref(db, "rooms/"+ROOM+"/players/"+playerId);
+
+  set(myRef, {
+    x: player.x,
+    y: player.y,
+    level: player.level,
+    hp: player.health
+  });
+
+  onDisconnect(myRef).remove();
+
+  // Pozisyon güncelle
+  setInterval(()=>{
+    set(myRef, {
+      x: player.x,
+      y: player.y,
+      level: player.level,
+      hp: player.health
+    });
+  }, 100);
+
+});
+
+// ---- DİĞER OYUNCULARI AL ----
+const remotePlayers = {};
+
+onValue(playersRef, snapshot=>{
+  const data = snapshot.val();
+  if (!data) return;
+
+  Object.keys(data).forEach(id=>{
+    if (id === playerId) return;
+    remotePlayers[id] = data[id];
+  });
+
+  // Silinenleri temizle
+  Object.keys(remotePlayers).forEach(id=>{
+    if (!data[id]) delete remotePlayers[id];
+  });
+});
+
+// ---- DRAW REMOTE PLAYERS ----
+const _drawOnline = draw;
+draw = function(){
+  _drawOnline();
+
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+  Object.values(remotePlayers).forEach(p=>{
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "#ff00ff";
+    ctx.fillStyle = "#ff00ff";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 16, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+};
+
+});
+});
+/* =========================
+   PVP SYSTEM (SECURE TRANSACTION)
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
+
+const { getDatabase, ref, runTransaction } = dbModule;
+
+const db = getDatabase();
+const ROOM = "world1";
+
+// PvP kontrol (melee alanında)
+function checkPvP() {
+  Object.entries(remotePlayers).forEach(([id, rp]) => {
+    const dist = Math.hypot(player.x - rp.x, player.y - rp.y);
+
+    if (dist < 40 && attackInput.melee) {
+      stealLevel(id);
+    }
+  });
+}
+
+// Güvenli level çalma
+function stealLevel(targetId) {
+  const targetRef = ref(db, "rooms/"+ROOM+"/players/"+targetId);
+
+  runTransaction(targetRef, currentData => {
+    if (currentData == null) return;
+
+    if (currentData.level > 1) {
+      const stolen = currentData.level;
+      currentData.level = 1;
+
+      // kazanana level ekle
+      player.level += stolen;
+
+      // kendi levelini DB'ye yaz
+      const myRef = ref(db, "rooms/"+ROOM+"/players/"+playerId);
+      runTransaction(myRef, myData => {
+        if (!myData) return;
+        myData.level = player.level;
+        return myData;
+      });
+
+      return currentData;
+    }
+
+    return currentData;
+  });
+}
+
+// Update zincirine bağla
+const _updatePvP = update;
+update = function(dt){
+  _updatePvP(dt);
+  checkPvP();
+};
+
+});
+/* =========================
+   GAME STATE + MAIN MENU
+========================= */
+
+let gameState = "menu";
+
+const menuScreen = document.createElement("div");
+menuScreen.style.cssText = `
+  position:fixed;
+  inset:0;
+  background:#000;
+  color:#0ff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  z-index:9999;
+`;
+menuScreen.innerHTML = `
+  <h1>NEON RISE ONLINE</h1>
+  <button id="startGame">START</button>
+`;
+document.body.appendChild(menuScreen);
+
+document.getElementById("startGame").onclick = () => {
+  gameState = "play";
+  menuScreen.style.display = "none";
+};
+
+const _updateState = update;
+update = function(dt){
+  if (gameState !== "play") return;
+  _updateState(dt);
+
+  if (player.health <= 0){
+    player.level = 1;
+    player.xp = 0;
+    player.health = player.maxHealth;
+    gameState = "menu";
+    menuScreen.style.display = "flex";
+  }
+};
+/* =========================
+   MINI BOSS SYSTEM
+========================= */
+
+function spawnMiniBoss(){
+  enemies.push({
+    type: "boss",
+    x: player.x + 300,
+    y: player.y,
+    size: 40,
+    speed: 60,
+    maxHealth: 500,
+    health: 500
+  });
+}
+
+setInterval(()=>{
+  if (player.level > 0 && player.level % 10 === 0){
+    spawnMiniBoss();
+  }
+}, 15000);
+/* =========================
+   SKIN DROP + WARDROBE
+========================= */
+
+player.inventory = [];
+player.equippedSkin = null;
+
+function dropSkin(){
+  const skin = "skin_" + Math.floor(Math.random()*1000);
+  player.inventory.push(skin);
+}
+
+function openWardrobe(){
+  const w = document.createElement("div");
+  w.style.cssText = `
+    position:fixed; inset:20%;
+    background:#000; color:#0ff;
+    border:2px solid #0ff;
+    overflow:auto;
+  `;
+  w.innerHTML = "<h3>DOLAP</h3>";
+
+  player.inventory.forEach(s=>{
+    const b = document.createElement("button");
+    b.textContent = s;
+    b.onclick = ()=> player.equippedSkin = s;
+    w.appendChild(b);
+  });
+
+  document.body.appendChild(w);
+}
+
+const wardrobeBtn = document.createElement("button");
+wardrobeBtn.textContent = "DOLAP";
+wardrobeBtn.style.position="fixed";
+wardrobeBtn.style.left="12px";
+wardrobeBtn.style.top="120px";
+document.body.appendChild(wardrobeBtn);
+
+wardrobeBtn.onclick = openWardrobe;
+/* =========================
+   ROOM SYSTEM (SELECTABLE ROOMS)
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
+
+const { getDatabase, ref, set, onValue, remove, onDisconnect, get } = dbModule;
+const db = getDatabase();
+
+let currentRoom = null;
+let myPlayerRef = null;
+
+// ---- ROOM UI ----
+const roomPanel = document.createElement("div");
+roomPanel.style.cssText = `
+  position:fixed;
+  inset:30%;
+  background:#000;
+  color:#0ff;
+  border:2px solid #0ff;
+  padding:20px;
+  z-index:99999;
+`;
+roomPanel.innerHTML = `
+  <h2>ODA SEÇ</h2>
+  <div id="roomList"></div>
+  <button onclick="closeRoomPanel()">KAPAT</button>
+`;
+document.body.appendChild(roomPanel);
+
+function closeRoomPanel(){
+  roomPanel.style.display="none";
+}
+
+// Room butonu
+const roomBtn = document.createElement("button");
+roomBtn.textContent = "ROOM";
+roomBtn.style.cssText = `
+  position:fixed;
+  top:90px;
+  right:12px;
+`;
+document.body.appendChild(roomBtn);
+
+roomBtn.onclick = ()=>{
+  roomPanel.style.display="block";
+  loadRooms();
+};
+
+// ---- ROOM LİSTESİ ----
+function loadRooms(){
+  const list = document.getElementById("roomList");
+  list.innerHTML = "Yükleniyor...";
+
+  get(ref(db, "rooms")).then(snapshot=>{
+    const data = snapshot.val() || {};
+    list.innerHTML = "";
+
+    for (let i=1;i<=5;i++){
+      const roomName = "world"+i;
+      const count = data[roomName]?.players ? 
+        Object.keys(data[roomName].players).length : 0;
+
+      const btn = document.createElement("button");
+      btn.textContent = `${roomName} (${count}/10)`;
+      btn.style.display="block";
+
+      btn.onclick = ()=>{
+        if (count >= 10){
+          alert("Oda dolu!");
+          return;
+        }
+        joinRoom(roomName);
+        closeRoomPanel();
+      };
+
+      list.appendChild(btn);
+    }
+  });
+}
+
+// ---- ROOM'A KATIL ----
+function joinRoom(roomName){
+
+  // eski odadan çık
+  if (myPlayerRef){
+    remove(myPlayerRef);
+  }
+
+  currentRoom = roomName;
+  const playerId = localStorage.getItem("playerName") || 
+                   "p_"+Math.random().toString(36).substr(2,9);
+
+  myPlayerRef = ref(db, `rooms/${roomName}/players/${playerId}`);
+
+  set(myPlayerRef, {
+    x: player.x,
+    y: player.y,
+    level: player.level,
+    hp: player.health
+  });
+
+  onDisconnect(myPlayerRef).remove();
+
+  // pozisyon güncelle
+  setInterval(()=>{
+    if (!currentRoom) return;
+    set(myPlayerRef, {
+      x: player.x,
+      y: player.y,
+      level: player.level,
+      hp: player.health
+    });
+  }, 120);
+
+  // diğer oyuncuları dinle
+  onValue(ref(db, `rooms/${roomName}/players`), snapshot=>{
+    const data = snapshot.val() || {};
+    Object.keys(remotePlayers).forEach(id=>delete remotePlayers[id]);
+
+    Object.entries(data).forEach(([id, p])=>{
+      if (id === playerId) return;
+      remotePlayers[id] = p;
+    });
+  });
+
+}
+
+});
+/* =========================
+   MAIN MENU ROOM SYSTEM + RESPAWN
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
+
+const { getDatabase, ref, set, get, remove, onDisconnect, onValue } = dbModule;
+const db = getDatabase();
+
+let currentRoom = null;
+let myPlayerRef = null;
+let myPlayerId = localStorage.getItem("playerName") || 
+                 "p_"+Math.random().toString(36).substr(2,9);
+
+localStorage.setItem("playerName", myPlayerId);
+
+/* ---------- ANA MENÜ ---------- */
+
+const mainMenu = document.createElement("div");
+mainMenu.style.cssText = `
+  position:fixed;
+  inset:0;
+  background:#000;
+  color:#0ff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  z-index:999999;
+`;
+mainMenu.innerHTML = `
+  <h1>NEON RISE ONLINE</h1>
+  <button id="createRoomBtn">ODA OLUŞTUR</button>
+  <button id="joinRoomBtn">ODAYA GİR</button>
+`;
+document.body.appendChild(mainMenu);
+
+/* ---------- ODA OLUŞTUR ---------- */
+
+document.getElementById("createRoomBtn").onclick = async () => {
+
+  const roomName = "room_" + Math.random().toString(36).substr(2,5);
+
+  // Respawn noktası oluştur
+  await set(ref(db, `rooms/${roomName}/meta`), {
+    respawn: {
+      x: 0,
+      y: 0
+    }
+  });
+
+  joinRoom(roomName);
+  mainMenu.style.display="none";
+};
+
+/* ---------- ODAYA GİR ---------- */
+
+document.getElementById("joinRoomBtn").onclick = async () => {
+
+  const roomsSnap = await get(ref(db, "rooms"));
+  const rooms = roomsSnap.val() || {};
+
+  for (const roomName in rooms) {
+
+    const players = rooms[roomName].players || {};
+    const count = Object.keys(players).length;
+
+    if (count < 10) {
+      joinRoom(roomName);
+      mainMenu.style.display="none";
+      return;
+    }
+  }
+
+  alert("Boş oda yok!");
+};
+
+/* ---------- ODAYA KATIL ---------- */
+
+async function joinRoom(roomName){
+
+  if (myPlayerRef){
+    remove(myPlayerRef);
+  }
+
+  currentRoom = roomName;
+
+  const roomMeta = await get(ref(db, `rooms/${roomName}/meta`));
+  const respawn = roomMeta.val()?.respawn || {x:0,y:0};
+
+  // Respawn konumuna ışınla
+  player.x = respawn.x;
+  player.y = respawn.y;
+
+  myPlayerRef = ref(db, `rooms/${roomName}/players/${myPlayerId}`);
+
+  await set(myPlayerRef, {
+    x: player.x,
+    y: player.y,
+    level: player.level,
+    hp: player.health
+  });
+
+  onDisconnect(myPlayerRef).remove();
+
+  // Pozisyon sync
+  setInterval(()=>{
+    if (!currentRoom) return;
+    set(myPlayerRef,{
+      x: player.x,
+      y: player.y,
+      level: player.level,
+      hp: player.health
+    });
+  }, 120);
+
+  // Remote players
+  onValue(ref(db, `rooms/${roomName}/players`), snapshot=>{
+    const data = snapshot.val() || {};
+    Object.keys(remotePlayers).forEach(id=>delete remotePlayers[id]);
+
+    Object.entries(data).forEach(([id,p])=>{
+      if (id === myPlayerId) return;
+      remotePlayers[id] = p;
+    });
+  });
+
+}
+
+/* ---------- ÖLÜNCE RESPAWN ---------- */
+
+const _updateRespawn = update;
+update = function(dt){
+  _updateRespawn(dt);
+
+  if (player.health <= 0 && currentRoom){
+
+    get(ref(db, `rooms/${currentRoom}/meta`)).then(snap=>{
+      const respawn = snap.val()?.respawn || {x:0,y:0};
+      player.x = respawn.x;
+      player.y = respawn.y;
+    });
+
+    player.level = 1;
+    player.health = player.maxHealth;
+  }
+};
+
+});
+/* =========================
+   REMOVE OLD START MENU FIX
+========================= */
+
+// Eski START butonunu gizle
+const oldStartBtn = document.getElementById("startGame");
+if (oldStartBtn) {
+  const oldMenu = oldStartBtn.closest("div");
+  if (oldMenu) oldMenu.style.display = "none";
+}
+
+// Eğer eski gameState varsa bypass et
+if (typeof gameState !== "undefined") {
+  gameState = "play";
+}
+/* =========================
+   ROOM CHAT SYSTEM
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
+
+const { getDatabase, ref, push, onValue } = dbModule;
+const db = getDatabase();
+
+let chatRoom = null;
+
+// Chat UI
+const chatBox = document.createElement("div");
+chatBox.style.cssText = `
+  position:fixed;
+  bottom:10px;
+  right:10px;
+  width:260px;
+  height:200px;
+  background:#000;
+  color:#0ff;
+  border:1px solid #0ff;
+  display:flex;
+  flex-direction:column;
+  font-size:12px;
+`;
+document.body.appendChild(chatBox);
+
+const chatMessages = document.createElement("div");
+chatMessages.style.flex="1";
+chatMessages.style.overflow="auto";
+chatBox.appendChild(chatMessages);
+
+const chatInput = document.createElement("input");
+chatInput.placeholder="Mesaj yaz...";
+chatInput.style.background="#111";
+chatInput.style.color="#0ff";
+chatBox.appendChild(chatInput);
+
+chatInput.addEventListener("keydown", e=>{
+  if (e.key === "Enter" && currentRoom){
+    push(ref(db, `rooms/${currentRoom}/chat`), {
+      user: myPlayerId,
+      msg: chatInput.value,
+      time: Date.now()
+    });
+    chatInput.value="";
+  }
+});
+
+// Odaya girince chat dinle
+function attachChat(roomName){
+  onValue(ref(db, `rooms/${roomName}/chat`), snap=>{
+    const data = snap.val() || {};
+    chatMessages.innerHTML="";
+    Object.values(data).slice(-20).forEach(m=>{
+      chatMessages.innerHTML += `<div><b>${m.user}:</b> ${m.msg}</div>`;
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
+}
+
+// joinRoom override
+const _joinRoomChat = joinRoom;
+joinRoom = function(roomName){
+  _joinRoomChat(roomName);
+  chatRoom = roomName;
+  attachChat(roomName);
+};
+
+});
+/* =========================
+   RESPAWN PROTECTION
+========================= */
+
+player.spawnShield = 0;
+
+const _updateShield = update;
+update = function(dt){
+  _updateShield(dt);
+
+  if (player.spawnShield > 0){
+    player.spawnShield -= dt;
+  }
+};
+
+// Respawn sırasında kalkan ver
+const _respawnFix = joinRoom;
+joinRoom = function(roomName){
+  _respawnFix(roomName);
+  player.spawnShield = 3;
+};
+
+// PvP kontrolüne ekle
+const _checkPvPShield = checkPvP;
+checkPvP = function(){
+  if (player.spawnShield > 0) return;
+  _checkPvPShield();
+};
+/* =========================
+   BOSS SPAWN CONDITION
+========================= */
+
+setInterval(()=>{
+  if (!currentRoom) return;
+
+  const playerCount = Object.keys(remotePlayers).length + 1;
+
+  if (playerCount >= 3){
+    spawnMiniBoss();
+  }
+
+}, 20000);
+/* =========================
+   RANK SYSTEM
+========================= */
+
+function getRank(level){
+  if (level >= 81) return "NEON GOD";
+  if (level >= 51) return "DIAMOND";
+  if (level >= 26) return "GOLD";
+  if (level >= 11) return "SILVER";
+  return "BRONZE";
+}
+
+// Rank HUD
+const rankHUD = document.createElement("div");
+rankHUD.style.cssText = `
+  position:fixed;
+  top:60px;
+  left:12px;
+  color:#0ff;
+  font-weight:bold;
+`;
+document.body.appendChild(rankHUD);
+
+// Rank güncelle
+const _updateRank = update;
+update = function(dt){
+  _updateRank(dt);
+  rankHUD.textContent = "RANK: " + getRank(player.level);
+};
+/* =========================
+   CLAN SYSTEM
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
+
+const { getDatabase, ref, set, get, update } = dbModule;
+const db = getDatabase();
+
+player.clan = null;
+
+// Clan UI
+const clanBtn = document.createElement("button");
+clanBtn.textContent = "CLAN";
+clanBtn.style.cssText = `
+  position:fixed;
+  top:120px;
+  left:12px;
+`;
+document.body.appendChild(clanBtn);
+
+const clanPanel = document.createElement("div");
+clanPanel.style.cssText = `
+  position:fixed;
+  inset:30%;
+  background:#000;
+  color:#0ff;
+  border:2px solid #0ff;
+  padding:20px;
+  display:none;
+`;
+document.body.appendChild(clanPanel);
+
+clanBtn.onclick = ()=>{
+  clanPanel.style.display = clanPanel.style.display==="none"?"block":"none";
+  renderClan();
+};
+
+function renderClan(){
+  clanPanel.innerHTML = `
+    <h2>CLAN</h2>
+    <input id="clanNameInput" placeholder="Clan adı">
+    <button id="createClan">Oluştur</button>
+    <button id="joinClan">Katıl</button>
+    <hr>
+    <div>Mevcut Clan: ${player.clan || "Yok"}</div>
+  `;
+
+  document.getElementById("createClan").onclick = async ()=>{
+    const name = document.getElementById("clanNameInput").value;
+    if (!name) return;
+
+    await set(ref(db, "clans/"+name+"/members/"+myPlayerId), true);
+    player.clan = name;
+    update(ref(db, "players/"+myPlayerId), { clan:name });
+    renderClan();
+  };
+
+  document.getElementById("joinClan").onclick = async ()=>{
+    const name = document.getElementById("clanNameInput").value;
+    if (!name) return;
+
+    const snap = await get(ref(db, "clans/"+name));
+    if (!snap.exists()){
+      alert("Clan yok!");
+      return;
+    }
+
+    await set(ref(db, "clans/"+name+"/members/"+myPlayerId), true);
+    player.clan = name;
+    update(ref(db, "players/"+myPlayerId), { clan:name });
+    renderClan();
+  };
+}
+
+});
+/* =========================
+   CLAN TAG DISPLAY
+========================= */
+
+const _drawClan = draw;
+draw = function(){
+  _drawClan();
+
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "12px Arial";
+  const tag = player.clan ? "["+player.clan+"] " : "";
+  ctx.fillText(tag + myPlayerId, player.x-20, player.y-25);
+
+  ctx.restore();
+};
 
 </script>
 </body>
