@@ -1519,6 +1519,107 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(d
 });
 });
 
+/* =========================
+   ONLINE WORLD (ROOM SYSTEM - MAX 10)
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js").then(appModule=>{
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
+
+const { initializeApp } = appModule;
+const { getDatabase, ref, set, onValue, remove, onDisconnect, get, child } = dbModule;
+
+const firebaseConfig = {
+  apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
+  authDomain: "pixelroom-ae218.firebaseapp.com",
+  databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "pixelroom-ae218",
+  storageBucket: "pixelroom-ae218.firebasestorage.app",
+  messagingSenderId: "720297722320",
+  appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const ROOM = "world1";
+const playerId = "p_" + Math.random().toString(36).substr(2,9);
+
+const playersRef = ref(db, "rooms/"+ROOM+"/players");
+
+// ---- MAX 10 KONTROL ----
+get(playersRef).then(snapshot=>{
+  const data = snapshot.val();
+  const count = data ? Object.keys(data).length : 0;
+  if (count >= 10){
+    alert("Oda dolu (10/10)");
+    return;
+  }
+
+  // Oyuncuyu ekle
+  const myRef = ref(db, "rooms/"+ROOM+"/players/"+playerId);
+
+  set(myRef, {
+    x: player.x,
+    y: player.y,
+    level: player.level,
+    hp: player.health
+  });
+
+  onDisconnect(myRef).remove();
+
+  // Pozisyon güncelle
+  setInterval(()=>{
+    set(myRef, {
+      x: player.x,
+      y: player.y,
+      level: player.level,
+      hp: player.health
+    });
+  }, 100);
+
+});
+
+// ---- DİĞER OYUNCULARI AL ----
+const remotePlayers = {};
+
+onValue(playersRef, snapshot=>{
+  const data = snapshot.val();
+  if (!data) return;
+
+  Object.keys(data).forEach(id=>{
+    if (id === playerId) return;
+    remotePlayers[id] = data[id];
+  });
+
+  // Silinenleri temizle
+  Object.keys(remotePlayers).forEach(id=>{
+    if (!data[id]) delete remotePlayers[id];
+  });
+});
+
+// ---- DRAW REMOTE PLAYERS ----
+const _drawOnline = draw;
+draw = function(){
+  _drawOnline();
+
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+  Object.values(remotePlayers).forEach(p=>{
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "#ff00ff";
+    ctx.fillStyle = "#ff00ff";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 16, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+};
+
+});
+});
 
 </script>
 </body>
