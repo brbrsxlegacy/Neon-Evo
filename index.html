@@ -27,15 +27,15 @@ button { padding:6px 10px; margin:4px; }
 <div id="hud"></div>
 <canvas id="game"></canvas>
 
-<script type="module">
+<!-- FIREBASE CDN (404 YOK) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<script>
 
 /* =========================
    FIREBASE INIT
 ========================= */
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, runTransaction, remove, onDisconnect } 
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
@@ -47,11 +47,11 @@ const firebaseConfig = {
   appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
 /* =========================
-   CORE GAME
+   CORE
 ========================= */
 
 const canvas = document.getElementById("game");
@@ -70,8 +70,7 @@ let player = {
   x:0,y:0,
   level:1,
   hp:100,
-  speed:3,
-  clan:null
+  speed:3
 };
 
 /* =========================
@@ -90,54 +89,53 @@ function getRank(lv){
    ROOM SYSTEM
 ========================= */
 
-window.createRoom = async function(){
+function createRoom(){
   const roomName = "room_"+Math.random().toString(36).substr(2,4);
 
-  await set(ref(db,"rooms/"+roomName+"/meta"),{
+  db.ref("rooms/"+roomName+"/meta").set({
     respawn:{x:0,y:0}
   });
 
   connectRoom(roomName);
 }
 
-window.joinRoom = async function(){
-  const snap = await get(ref(db,"rooms"));
-  const rooms = snap.val()||{};
-
-  for(const r in rooms){
-    const count = rooms[r].players?Object.keys(rooms[r].players).length:0;
-    if(count<10){
-      connectRoom(r);
-      return;
+function joinRoom(){
+  db.ref("rooms").once("value").then(snap=>{
+    const rooms = snap.val()||{};
+    for(const r in rooms){
+      const count = rooms[r].players?Object.keys(rooms[r].players).length:0;
+      if(count<10){
+        connectRoom(r);
+        return;
+      }
     }
-  }
-
-  alert("Boş oda yok");
+    alert("Boş oda yok");
+  });
 }
 
-async function connectRoom(roomName){
+function connectRoom(roomName){
 
   document.getElementById("menu").style.display="none";
   currentRoom = roomName;
 
-  const meta = await get(ref(db,"rooms/"+roomName+"/meta"));
-  const spawn = meta.val().respawn;
+  db.ref("rooms/"+roomName+"/meta").once("value").then(meta=>{
+    const spawn = meta.val().respawn;
+    player.x = spawn.x;
+    player.y = spawn.y;
+  });
 
-  player.x = spawn.x;
-  player.y = spawn.y;
+  myRef = db.ref("rooms/"+roomName+"/players/"+playerId);
 
-  myRef = ref(db,"rooms/"+roomName+"/players/"+playerId);
-
-  await set(myRef,{
+  myRef.set({
     x:player.x,
     y:player.y,
     level:player.level,
     hp:player.hp
   });
 
-  onDisconnect(myRef).remove();
+  myRef.onDisconnect().remove();
 
-  onValue(ref(db,"rooms/"+roomName+"/players"),snap=>{
+  db.ref("rooms/"+roomName+"/players").on("value",snap=>{
     const data = snap.val()||{};
     remotePlayers={};
     for(const id in data){
@@ -156,7 +154,7 @@ async function connectRoom(roomName){
 
 function syncPlayer(){
   if(!currentRoom) return;
-  set(myRef,{
+  myRef.set({
     x:player.x,
     y:player.y,
     level:player.level,
@@ -183,7 +181,6 @@ function update(){
   if(keys["a"]) player.x-=player.speed;
   if(keys["d"]) player.x+=player.speed;
 
-  // PvP steal
   for(const id in remotePlayers){
     const p=remotePlayers[id];
     const dist=Math.hypot(player.x-p.x,player.y-p.y);
@@ -198,9 +195,9 @@ function update(){
 
 function stealLevel(targetId){
 
-  const targetRef=ref(db,"rooms/"+currentRoom+"/players/"+targetId);
+  const targetRef=db.ref("rooms/"+currentRoom+"/players/"+targetId);
 
-  runTransaction(targetRef,data=>{
+  targetRef.transaction(data=>{
     if(!data) return;
     if(data.level>1){
       player.level+=data.level;
@@ -249,4 +246,3 @@ loop();
 </script>
 </body>
 </html>
-
