@@ -242,6 +242,221 @@ function loop(){
   requestAnimationFrame(loop);
 }
 loop();
+/* =========================
+   VISUAL & MOBILE UPGRADE
+========================= */
+
+// Responsive canvas
+function resizeCanvas(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+// Parallax yıldızlar
+const stars = [];
+for(let i=0;i<120;i++){
+  stars.push({
+    x:Math.random()*2000-1000,
+    y:Math.random()*2000-1000,
+    size:Math.random()*2+1
+  });
+}
+
+// Mobil joystick
+let touchActive=false;
+let joyX=0, joyY=0;
+
+canvas.addEventListener("touchstart", e=>{
+  touchActive=true;
+});
+
+canvas.addEventListener("touchmove", e=>{
+  const t=e.touches[0];
+  joyX=(t.clientX-canvas.width/2)/80;
+  joyY=(t.clientY-canvas.height/2)/80;
+});
+
+canvas.addEventListener("touchend", ()=>{
+  touchActive=false;
+  joyX=0; joyY=0;
+});
+
+// Update override (mobil destekli)
+const _updateVisual = update;
+update = function(){
+
+  _updateVisual();
+
+  if(touchActive){
+    player.x += joyX*player.speed;
+    player.y += joyY*player.speed;
+  }
+};
+
+// Draw override
+const _drawVisual = draw;
+draw = function(){
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Yıldız arkaplan
+  ctx.fillStyle="#050510";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(canvas.width/2,canvas.height/2);
+
+  stars.forEach(s=>{
+    ctx.fillStyle="#111";
+    ctx.beginPath();
+    ctx.arc(
+      s.x-player.x*0.2,
+      s.y-player.y*0.2,
+      s.size,
+      0,Math.PI*2
+    );
+    ctx.fill();
+  });
+
+  ctx.restore();
+
+  // Eski draw (oyuncular)
+  _drawVisual();
+
+  // Oyuncu glow
+  ctx.save();
+  ctx.translate(canvas.width/2,canvas.height/2);
+
+  ctx.shadowBlur=25;
+  ctx.shadowColor="#0ff";
+  ctx.fillStyle="#0ff";
+  ctx.beginPath();
+  ctx.arc(0,0,18,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+};
+/* =========================
+   CHARACTER & BACKGROUND PRO UPGRADE
+========================= */
+
+// Neon grid arkaplan
+function drawBackground(){
+
+  ctx.fillStyle="#050510";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.strokeStyle="rgba(0,255,255,0.08)";
+  ctx.lineWidth=1;
+
+  const gridSize=60;
+
+  for(let x=-(player.x%gridSize); x<canvas.width; x+=gridSize){
+    ctx.beginPath();
+    ctx.moveTo(x,0);
+    ctx.lineTo(x,canvas.height);
+    ctx.stroke();
+  }
+
+  for(let y=-(player.y%gridSize); y<canvas.height; y+=gridSize){
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    ctx.lineTo(canvas.width,y);
+    ctx.stroke();
+  }
+}
+
+// Yeni karakter çizimi
+function drawPlayer(){
+
+  ctx.save();
+  ctx.translate(canvas.width/2,canvas.height/2);
+
+  // Glow aura
+  ctx.shadowBlur=25;
+  ctx.shadowColor="#0ff";
+
+  // Gövde
+  ctx.fillStyle="#0ff";
+  ctx.fillRect(-12,-18,24,36);
+
+  // Baş
+  ctx.beginPath();
+  ctx.arc(0,-28,12,0,Math.PI*2);
+  ctx.fill();
+
+  // Gözler
+  ctx.shadowBlur=0;
+  ctx.fillStyle="#000";
+  ctx.fillRect(-5,-32,4,4);
+  ctx.fillRect(1,-32,4,4);
+
+  ctx.restore();
+}
+
+// Remote player upgrade
+function drawRemotePlayer(p){
+
+  ctx.save();
+  ctx.translate(
+    canvas.width/2+(p.x-player.x),
+    canvas.height/2+(p.y-player.y)
+  );
+
+  ctx.shadowBlur=20;
+  ctx.shadowColor="#f0f";
+  ctx.fillStyle="#f0f";
+
+  ctx.fillRect(-12,-18,24,36);
+  ctx.beginPath();
+  ctx.arc(0,-28,12,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// DRAW override
+draw = function(){
+
+  drawBackground();
+
+  drawPlayer();
+
+  for(const id in remotePlayers){
+    drawRemotePlayer(remotePlayers[id]);
+  }
+};
+/* =========================
+   MOBILE ATTACK BUTTON
+========================= */
+
+const attackBtn=document.createElement("div");
+attackBtn.style.cssText=`
+position:fixed;
+bottom:40px;
+right:40px;
+width:70px;
+height:70px;
+border-radius:50%;
+background:rgba(255,0,255,0.2);
+border:2px solid #f0f;
+display:flex;
+align-items:center;
+justify-content:center;
+color:#f0f;
+font-weight:bold;
+`;
+attackBtn.innerText="⚔";
+document.body.appendChild(attackBtn);
+
+attackBtn.addEventListener("touchstart",()=>{
+  keys[" "]=true;
+});
+attackBtn.addEventListener("touchend",()=>{
+  keys[" "]=false;
+});
 
 </script>
 </body>
