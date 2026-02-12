@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<h1>TEST 123</h1>
 <html>
 <head>
 <meta charset="UTF-8">
@@ -458,6 +457,660 @@ attackBtn.addEventListener("touchstart",()=>{
 attackBtn.addEventListener("touchend",()=>{
   keys[" "]=false;
 });
+/* =========================
+   COMBAT SYSTEM REWORK
+========================= */
+
+player.maxHp = 100;
+player.hp = 100;
+player.spawnShield = 0;
+
+// Respawn fonksiyonu
+function respawn() {
+  player.hp = player.maxHp;
+  player.spawnShield = 3; // 3 saniye koruma
+}
+
+// Damage verme
+function dealDamage(targetId) {
+
+  if (!currentRoom) return;
+
+  const targetRef = db.ref("rooms/"+currentRoom+"/players/"+targetId);
+
+  targetRef.transaction(data => {
+    if (!data) return;
+
+    if (data.hp === undefined) data.hp = 100;
+
+    data.hp -= 25;
+
+    if (data.hp <= 0) {
+      player.level += data.level || 1;
+      data.level = 1;
+      data.hp = 100;
+    }
+
+    return data;
+  });
+}
+
+// Update override
+const _updateCombat = update;
+update = function() {
+
+  _updateCombat();
+
+  // Spawn shield sayacı
+  if (player.spawnShield > 0) {
+    player.spawnShield -= 1/60;
+  }
+
+  // PvP kontrol
+  if (keys[" "]) {
+    for (const id in remotePlayers) {
+      const p = remotePlayers[id];
+      const dist = Math.hypot(player.x - p.x, player.y - p.y);
+
+      if (dist < 40 && player.spawnShield <= 0) {
+        dealDamage(id);
+      }
+    }
+  }
+
+  // Ölüm kontrol
+  if (player.hp <= 0) {
+    respawn();
+  }
+
+  hud.innerHTML =
+    "HP: "+player.hp+
+    " | Level: "+player.level+
+    " | Rank: "+getRank(player.level);
+};
+
+// Sync hp de gönder
+function syncPlayer(){
+  if(!currentRoom) return;
+  myRef.set({
+    x:player.x,
+    y:player.y,
+    level:player.level,
+    hp:player.hp
+  });
+}
+/* =========================
+   MINI BOSS SYSTEM
+========================= */
+
+let boss = null;
+let bossSpawnTimer = 0;
+
+function spawnBoss() {
+
+  boss = {
+    x: player.x + 300,
+    y: player.y,
+    hp: 500,
+    maxHp: 500,
+    size: 40,
+    alive: true
+  };
+
+}
+
+function updateBoss() {
+
+  if (!boss || !boss.alive) return;
+
+  // Basit takip AI
+  const dx = player.x - boss.x;
+  const dy = player.y - boss.y;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist > 5) {
+    boss.x += dx / dist * 1.2;
+    boss.y += dy / dist * 1.2;
+  }
+
+  // Boss damage player
+  if (dist < 50 && player.spawnShield <= 0) {
+    player.hp -= 0.3;
+  }
+
+}
+
+function drawBoss() {
+
+  if (!boss || !boss.alive) return;
+
+  ctx.save();
+
+  ctx.translate(
+    canvas.width/2 + (boss.x - player.x),
+    canvas.height/2 + (boss.y - player.y)
+  );
+
+  ctx.shadowBlur = 30;
+  ctx.shadowColor = "#ff0000";
+
+  ctx.fillStyle = "#ff0000";
+  ctx.beginPath();
+  ctx.arc(0,0,boss.size,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // Boss HP bar
+  ctx.fillStyle = "black";
+  ctx.fillRect(canvas.width/2 - 150, 20, 300, 20);
+
+  ctx.fillStyle = "red";
+  ctx.fillRect(
+    canvas.width/2 - 150,
+    20,
+    300 * (boss.hp / boss.maxHp),
+    20
+  );
+}
+
+// Boss damage
+function damageBoss() {
+
+  if (!boss || !boss.alive) return;
+
+  const dist = Math.hypot(player.x - boss.x, player.y - boss.y);
+
+  if (dist < 60) {
+    boss.hp -= 20;
+
+    if (boss.hp <= 0) {
+      boss.alive = false;
+      player.level += 5; // Boss reward
+    }
+  }
+
+}
+
+// Update override
+const _updateBossMain = update;
+update = function() {
+
+  _updateBossMain();
+
+  const playerCount = Object.keys(remotePlayers).length + 1;
+
+  bossSpawnTimer += 1/60;
+
+  if (!boss && playerCount >= 3 && bossSpawnTimer > 30) {
+    spawnBoss();
+    bossSpawnTimer = 0;
+  }
+
+  updateBoss();
+
+  if (keys[" "]){
+    damageBoss();
+  }
+
+};
+
+// Draw override
+const _drawBossMain = draw;
+draw = function() {
+
+  _drawBossMain();
+
+  drawBoss();
+
+};
+/* =========================
+   LOOT + INVENTORY SYSTEM
+========================= */
+
+player.inventory = [];
+player.equippedSkin = null;
+
+const skinPool = [
+  "#0ff",
+  "#f0f",
+  "#0f0",
+  "#ff0",
+  "#ff6600",
+  "#00ffaa",
+  "#ffffff"
+];
+
+function dropLoot() {
+
+  const randomSkin = skinPool[
+    Math.floor(Math.random()*skinPool.length)
+  ];
+
+  player.inventory.push(randomSkin);
+
+  alert("Yeni Skin Kazandın!");
+
+}
+
+// Boss öldüğünde loot ver
+const _spawnBossCheck = spawnBoss;
+spawnBoss = function(){
+  _spawnBossCheck();
+};
+
+// Boss ölüm override
+const _damageBossCheck = damageBoss;
+damageBoss = function(){
+
+  if (!boss || !boss.alive) return;
+
+  const prevHp = boss.hp;
+
+  _damageBossCheck();
+
+  if (prevHp > 0 && boss.hp <= 0) {
+    dropLoot();
+  }
+
+};
+
+// Dolap UI
+const wardrobeBtn = document.createElement("button");
+wardrobeBtn.innerText = "DOLAP";
+wardrobeBtn.style.position="fixed";
+wardrobeBtn.style.right="20px";
+wardrobeBtn.style.top="20px";
+document.body.appendChild(wardrobeBtn);
+
+const wardrobePanel = document.createElement("div");
+wardrobePanel.style.cssText = `
+position:fixed;
+inset:20%;
+background:#000;
+border:2px solid #0ff;
+display:none;
+flex-wrap:wrap;
+padding:20px;
+`;
+document.body.appendChild(wardrobePanel);
+
+wardrobeBtn.onclick = ()=>{
+  wardrobePanel.style.display =
+    wardrobePanel.style.display==="none"?"flex":"none";
+
+  wardrobePanel.innerHTML="";
+
+  player.inventory.forEach(color=>{
+    const skinBox=document.createElement("div");
+    skinBox.style.width="60px";
+    skinBox.style.height="60px";
+    skinBox.style.margin="10px";
+    skinBox.style.background=color;
+    skinBox.style.cursor="pointer";
+
+    skinBox.onclick=()=>{
+      player.equippedSkin=color;
+      wardrobePanel.style.display="none";
+    };
+
+    wardrobePanel.appendChild(skinBox);
+  });
+};
+
+// Karakter rengini override
+const _drawSkin = draw;
+draw = function(){
+
+  _drawSkin();
+
+  if(player.equippedSkin){
+    ctx.save();
+    ctx.translate(canvas.width/2,canvas.height/2);
+
+    ctx.shadowBlur=30;
+    ctx.shadowColor=player.equippedSkin;
+    ctx.fillStyle=player.equippedSkin;
+
+    ctx.beginPath();
+    ctx.arc(0,0,18,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+};
+/* =========================
+   LOOT + INVENTORY SYSTEM
+========================= */
+
+player.inventory = [];
+player.equippedSkin = null;
+
+const skinPool = [
+  "#0ff",
+  "#f0f",
+  "#0f0",
+  "#ff0",
+  "#ff6600",
+  "#00ffaa",
+  "#ffffff"
+];
+
+function dropLoot() {
+
+  const randomSkin = skinPool[
+    Math.floor(Math.random()*skinPool.length)
+  ];
+
+  player.inventory.push(randomSkin);
+
+  alert("Yeni Skin Kazandın!");
+
+}
+
+// Boss öldüğünde loot ver
+const _spawnBossCheck = spawnBoss;
+spawnBoss = function(){
+  _spawnBossCheck();
+};
+
+// Boss ölüm override
+const _damageBossCheck = damageBoss;
+damageBoss = function(){
+
+  if (!boss || !boss.alive) return;
+
+  const prevHp = boss.hp;
+
+  _damageBossCheck();
+
+  if (prevHp > 0 && boss.hp <= 0) {
+    dropLoot();
+  }
+
+};
+
+// Dolap UI
+const wardrobeBtn = document.createElement("button");
+wardrobeBtn.innerText = "DOLAP";
+wardrobeBtn.style.position="fixed";
+wardrobeBtn.style.right="20px";
+wardrobeBtn.style.top="20px";
+document.body.appendChild(wardrobeBtn);
+
+const wardrobePanel = document.createElement("div");
+wardrobePanel.style.cssText = `
+position:fixed;
+inset:20%;
+background:#000;
+border:2px solid #0ff;
+display:none;
+flex-wrap:wrap;
+padding:20px;
+`;
+document.body.appendChild(wardrobePanel);
+
+wardrobeBtn.onclick = ()=>{
+  wardrobePanel.style.display =
+    wardrobePanel.style.display==="none"?"flex":"none";
+
+  wardrobePanel.innerHTML="";
+
+  player.inventory.forEach(color=>{
+    const skinBox=document.createElement("div");
+    skinBox.style.width="60px";
+    skinBox.style.height="60px";
+    skinBox.style.margin="10px";
+    skinBox.style.background=color;
+    skinBox.style.cursor="pointer";
+
+    skinBox.onclick=()=>{
+      player.equippedSkin=color;
+      wardrobePanel.style.display="none";
+    };
+
+    wardrobePanel.appendChild(skinBox);
+  });
+};
+
+// Karakter rengini override
+const _drawSkin = draw;
+draw = function(){
+
+  _drawSkin();
+
+  if(player.equippedSkin){
+    ctx.save();
+    ctx.translate(canvas.width/2,canvas.height/2);
+
+    ctx.shadowBlur=30;
+    ctx.shadowColor=player.equippedSkin;
+    ctx.fillStyle=player.equippedSkin;
+
+    ctx.beginPath();
+    ctx.arc(0,0,18,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+};
+/* =========================
+   CLAN TAG DISPLAY
+========================= */
+
+const _drawClanTag = draw;
+draw = function(){
+
+  _drawClanTag();
+
+  // Kendi tag
+  if(player.clan){
+    ctx.fillStyle="#fff";
+    ctx.fillText(
+      "["+player.clan+"]",
+      canvas.width/2-30,
+      canvas.height/2-40
+    );
+  }
+
+  // Remote tag
+  for(const id in remotePlayers){
+    const p = remotePlayers[id];
+
+    ctx.fillStyle="#fff";
+    ctx.fillText(
+      id,
+      canvas.width/2+(p.x-player.x)-20,
+      canvas.height/2+(p.y-player.y)-40
+    );
+  }
+};
+/* =========================
+   CLAN TAG DISPLAY
+========================= */
+
+const _drawClanTag = draw;
+draw = function(){
+
+  _drawClanTag();
+
+  // Kendi tag
+  if(player.clan){
+    ctx.fillStyle="#fff";
+    ctx.fillText(
+      "["+player.clan+"]",
+      canvas.width/2-30,
+      canvas.height/2-40
+    );
+  }
+
+  // Remote tag
+  for(const id in remotePlayers){
+    const p = remotePlayers[id];
+
+    ctx.fillStyle="#fff";
+    ctx.fillText(
+      id,
+      canvas.width/2+(p.x-player.x)-20,
+      canvas.height/2+(p.y-player.y)-40
+    );
+  }
+};
+/* =========================
+   GLOBAL LEADERBOARD
+========================= */
+
+const lbPanel=document.createElement("div");
+lbPanel.style.cssText=`
+position:fixed;
+right:10px;
+bottom:10px;
+background:#000;
+border:2px solid #0ff;
+padding:10px;
+width:200px;
+max-height:250px;
+overflow:auto;
+font-size:12px;
+`;
+document.body.appendChild(lbPanel);
+
+// Score gönder
+setInterval(()=>{
+  db.ref("leaderboard/"+playerId).set({
+    level:player.level,
+    clan:player.clan||"none"
+  });
+},3000);
+
+// Liste çek
+db.ref("leaderboard").on("value",snap=>{
+  const data=snap.val()||{};
+  const arr=Object.entries(data)
+    .sort((a,b)=>b[1].level-a[1].level)
+    .slice(0,10);
+
+  lbPanel.innerHTML="<b>GLOBAL RANK</b><hr>";
+
+  arr.forEach((p,i)=>{
+    lbPanel.innerHTML+=
+      (i+1)+". "+p[0]+" - "+p[1].level+
+      "<br>";
+  });
+});
+/* =========================
+   CLAN LEADERBOARD
+========================= */
+
+db.ref("clans").on("value",snap=>{
+  const clans=snap.val()||{};
+  let clanStats=[];
+
+  for(const name in clans){
+    const members=clans[name].members||{};
+    clanStats.push({
+      name:name,
+      count:Object.keys(members).length
+    });
+  }
+
+  clanStats.sort((a,b)=>b.count-a.count);
+
+  lbPanel.innerHTML+="<hr><b>CLAN RANK</b><br>";
+
+  clanStats.slice(0,5).forEach((c,i)=>{
+    lbPanel.innerHTML+=
+      (i+1)+". "+c.name+
+      " ("+c.count+")<br>";
+  });
+});
+const dashBtn=document.createElement("div");
+dashBtn.innerText="⚡";
+dashBtn.style.cssText=`
+position:fixed;
+bottom:120px;
+right:40px;
+width:70px;
+height:70px;
+border-radius:50%;
+background:rgba(0,255,255,0.2);
+border:2px solid #0ff;
+display:flex;
+align-items:center;
+justify-content:center;
+color:#0ff;
+font-weight:bold;
+`;
+document.body.appendChild(dashBtn);
+
+dashBtn.addEventListener("touchstart",dash);
+/* =========================
+   XP BAR SYSTEM
+========================= */
+
+player.xp = 0;
+player.xpToNext = 100;
+
+function gainXP(amount){
+  player.xp += amount;
+
+  if(player.xp >= player.xpToNext){
+    player.level++;
+    player.xp = 0;
+  }
+}
+
+// Boss öldüğünde XP ver
+const _bossRewardXP = damageBoss;
+damageBoss = function(){
+
+  const prev = boss?.hp;
+
+  _bossRewardXP();
+
+  if(prev>0 && boss && boss.hp<=0){
+    gainXP(50);
+  }
+};
+
+// XP BAR DRAW
+const _drawXP = draw;
+draw = function(){
+
+  _drawXP();
+
+  ctx.fillStyle="black";
+  ctx.fillRect(20,canvas.height-40,200,20);
+
+  ctx.fillStyle="#0ff";
+  ctx.fillRect(
+    20,
+    canvas.height-40,
+    200*(player.xp/player.xpToNext),
+    20
+  );
+};
+const _drawDashEffect = draw;
+draw = function(){
+
+  _drawDashEffect();
+
+  if(player.dashing > 0){
+
+    ctx.save();
+    ctx.translate(canvas.width/2,canvas.height/2);
+
+    ctx.shadowBlur=40;
+    ctx.shadowColor="#0ff";
+    ctx.strokeStyle="#0ff";
+    ctx.lineWidth=4;
+    ctx.beginPath();
+    ctx.arc(0,0,25,0,Math.PI*2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+};
 
 </script>
 </body>
