@@ -1782,6 +1782,135 @@ wardrobeBtn.style.top="120px";
 document.body.appendChild(wardrobeBtn);
 
 wardrobeBtn.onclick = openWardrobe;
+/* =========================
+   ROOM SYSTEM (SELECTABLE ROOMS)
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
+
+const { getDatabase, ref, set, onValue, remove, onDisconnect, get } = dbModule;
+const db = getDatabase();
+
+let currentRoom = null;
+let myPlayerRef = null;
+
+// ---- ROOM UI ----
+const roomPanel = document.createElement("div");
+roomPanel.style.cssText = `
+  position:fixed;
+  inset:30%;
+  background:#000;
+  color:#0ff;
+  border:2px solid #0ff;
+  padding:20px;
+  z-index:99999;
+`;
+roomPanel.innerHTML = `
+  <h2>ODA SEÇ</h2>
+  <div id="roomList"></div>
+  <button onclick="closeRoomPanel()">KAPAT</button>
+`;
+document.body.appendChild(roomPanel);
+
+function closeRoomPanel(){
+  roomPanel.style.display="none";
+}
+
+// Room butonu
+const roomBtn = document.createElement("button");
+roomBtn.textContent = "ROOM";
+roomBtn.style.cssText = `
+  position:fixed;
+  top:90px;
+  right:12px;
+`;
+document.body.appendChild(roomBtn);
+
+roomBtn.onclick = ()=>{
+  roomPanel.style.display="block";
+  loadRooms();
+};
+
+// ---- ROOM LİSTESİ ----
+function loadRooms(){
+  const list = document.getElementById("roomList");
+  list.innerHTML = "Yükleniyor...";
+
+  get(ref(db, "rooms")).then(snapshot=>{
+    const data = snapshot.val() || {};
+    list.innerHTML = "";
+
+    for (let i=1;i<=5;i++){
+      const roomName = "world"+i;
+      const count = data[roomName]?.players ? 
+        Object.keys(data[roomName].players).length : 0;
+
+      const btn = document.createElement("button");
+      btn.textContent = `${roomName} (${count}/10)`;
+      btn.style.display="block";
+
+      btn.onclick = ()=>{
+        if (count >= 10){
+          alert("Oda dolu!");
+          return;
+        }
+        joinRoom(roomName);
+        closeRoomPanel();
+      };
+
+      list.appendChild(btn);
+    }
+  });
+}
+
+// ---- ROOM'A KATIL ----
+function joinRoom(roomName){
+
+  // eski odadan çık
+  if (myPlayerRef){
+    remove(myPlayerRef);
+  }
+
+  currentRoom = roomName;
+  const playerId = localStorage.getItem("playerName") || 
+                   "p_"+Math.random().toString(36).substr(2,9);
+
+  myPlayerRef = ref(db, `rooms/${roomName}/players/${playerId}`);
+
+  set(myPlayerRef, {
+    x: player.x,
+    y: player.y,
+    level: player.level,
+    hp: player.health
+  });
+
+  onDisconnect(myPlayerRef).remove();
+
+  // pozisyon güncelle
+  setInterval(()=>{
+    if (!currentRoom) return;
+    set(myPlayerRef, {
+      x: player.x,
+      y: player.y,
+      level: player.level,
+      hp: player.health
+    });
+  }, 120);
+
+  // diğer oyuncuları dinle
+  onValue(ref(db, `rooms/${roomName}/players`), snapshot=>{
+    const data = snapshot.val() || {};
+    Object.keys(remotePlayers).forEach(id=>delete remotePlayers[id]);
+
+    Object.entries(data).forEach(([id, p])=>{
+      if (id === playerId) return;
+      remotePlayers[id] = p;
+    });
+  });
+
+}
+
+});
 
 </script>
 </body>
