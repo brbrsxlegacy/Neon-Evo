@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>NEON RISE ONLINE</title>
+<style>
+body { margin:0; background:#000; color:#0ff; font-family:Arial; overflow:hidden; }
+canvas { display:block; }
+button { padding:6px 10px; margin:4px; }
+#menu {
+  position:fixed; inset:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  background:#000; z-index:10;
+}
+#hud { position:fixed; top:10px; left:10px; }
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <h1>NEON RISE ONLINE</h1>
+  <button onclick="createRoom()">ODA OLUŞTUR</button>
+  <button onclick="joinRoom()">ODAYA GİR</button>
+</div>
+
+<div id="hud"></div>
+<canvas id="game"></canvas>
+
+<!-- FIREBASE CDN (404 YOK) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<script>
+
+/* =========================
+   FIREBASE INIT
+========================= */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
+  authDomain: "pixelroom-ae218.firebaseapp.com",
+  databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "pixelroom-ae218",
+  storageBucket: "pixelroom-ae218.firebasestorage.app",
+  messagingSenderId: "720297722320",
+  appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* =========================
+   CORE
+========================= */
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+const hud = document.getElementById("hud");
+
+let currentRoom = null;
+let playerId = "p_"+Math.random().toString(36).substr(2,5);
+let myRef = null;
+let remotePlayers = {};
+
+let player = {
+  x:0,y:0,
+  level:1,
+  hp:100,
+  speed:3
+};
+
+/* =========================
+   RANK
+========================= */
+
+function getRank(lv){
+  if(lv>=80) return "NEON GOD";
+  if(lv>=50) return "DIAMOND";
+  if(lv>=25) return "GOLD";
+  if(lv>=10) return "SILVER";
+  return "BRONZE";
+}
+
+/* =========================
+   ROOM SYSTEM
+========================= */
+
+function createRoom(){
+  const roomName = "room_"+Math.random().toString(36).substr(2,4);
+
+  db.ref("rooms/"+roomName+"/meta").set({
+    respawn:{x:0,y:0}
+  });
+
+  connectRoom(roomName);
+}
+
+function joinRoom(){
+  db.ref("rooms").once("value").then(snap=>{
+    const rooms = snap.val()||{};
+    for(const r in rooms){
+      const count = rooms[r].players?Object.keys(rooms[r].players).length:0;
+      if(count<10){
+        connectRoom(r);
+        return;
+      }
+    }
+    alert("Boş oda yok");
+  });
+}
+
+function connectRoom(roomName){
+
+  document.getElementById("menu").style.display="none";
+  currentRoom = roomName;
+
+  db.ref("rooms/"+roomName+"/meta").once("value").then(meta=>{
+    const spawn = meta.val().respawn;
+    player.x = spawn.x;
+    player.y = spawn.y;
+  });
+
+  myRef = db.ref("rooms/"+roomName+"/players/"+playerId);
+
+  myRef.set({
+    x:player.x,
+    y:player.y,
+    level:player.level,
+    hp:player.hp
+  });
+
+  myRef.onDisconnect().remove();
+
+  db.ref("rooms/"+roomName+"/players").on("value",snap=>{
+    const data = snap.val()||{};
+    remotePlayers={};
+    for(const id in data){
+      if(id!==playerId){
+        remotePlayers[id]=data[id];
+      }
+    }
+  });
+
+  setInterval(syncPlayer,100);
+}
+
+/* =========================
+   SYNC
+========================= */
+
+function syncPlayer(){
+  if(!currentRoom) return;
+  myRef.set({
+    x:player.x,
+    y:player.y,
+    level:player.level,
+    hp:player.hp
+  });
+}
+
+/* =========================
+   INPUT
+========================= */
+
+let keys={};
+onkeydown=e=>keys[e.key]=true;
+onkeyup=e=>keys[e.key]=false;
+
+/* =========================
+   UPDATE
+========================= */
+
+function update(){
+
+  if(keys["w"]) player.y-=player.speed;
+  if(keys["s"]) player.y+=player.speed;
+  if(keys["a"]) player.x-=player.speed;
+  if(keys["d"]) player.x+=player.speed;
+
+  for(const id in remotePlayers){
+    const p=remotePlayers[id];
+    const dist=Math.hypot(player.x-p.x,player.y-p.y);
+    if(dist<30 && keys[" "]){
+      stealLevel(id);
+    }
+  }
+
+  hud.innerHTML="Level: "+player.level+
+                " | Rank: "+getRank(player.level);
+}
+
+function stealLevel(targetId){
+
+  const targetRef=db.ref("rooms/"+currentRoom+"/players/"+targetId);
+
+  targetRef.transaction(data=>{
+    if(!data) return;
+    if(data.level>1){
+      player.level+=data.level;
+      data.level=1;
+    }
+    return data;
+  });
+}
+
+/* =========================
+   DRAW
+========================= */
+
+function draw(){
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle="#0ff";
+  ctx.beginPath();
+  ctx.arc(canvas.width/2,canvas.height/2,15,0,Math.PI*2);
+  ctx.fill();
+
+  for(const id in remotePlayers){
+    const p=remotePlayers[id];
+    ctx.fillStyle="#f0f";
+    ctx.beginPath();
+    ctx.arc(
+      canvas.width/2+(p.x-player.x),
+      canvas.height/2+(p.y-player.y),
+      15,0,Math.PI*2);
+    ctx.fill();
+  }
+}
+
+/* =========================
+   LOOP
+========================= */
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+/* =========================
+   VISUAL & MOBILE UPGRADE
+========================= */
+
+// Responsive canvas
+function resizeCanvas(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+// Parallax yıldızlar
+const stars = [];
+for(let i=0;i<120;i++){
+  stars.push({
+    x:Math.random()*2000-1000,
+    y:Math.random()*2000-1000,
+    size:Math.random()*2+1
+  });
+}
+
+// Mobil joystick
+let touchActive=false;
+let joyX=0, joyY=0;
+
+canvas.addEventListener("touchstart", e=>{
+  touchActive=true;
+});
+
+canvas.addEventListener("touchmove", e=>{
+  const t=e.touches[0];
+  joyX=(t.clientX-canvas.width/2)/80;
+  joyY=(t.clientY-canvas.height/2)/80;
+});
+
+canvas.addEventListener("touchend", ()=>{
+  touchActive=false;
+  joyX=0; joyY=0;
+});
+
+// Update override (mobil destekli)
+const _updateVisual = update;
+update = function(){
+
+  _updateVisual();
+
+  if(touchActive){
+    player.x += joyX*player.speed;
+    player.y += joyY*player.speed;
+  }
+};
+
+// Draw override
+const _drawVisual = draw;
+draw = function(){
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Yıldız arkaplan
+  ctx.fillStyle="#050510";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(canvas.width/2,canvas.height/2);
+
+  stars.forEach(s=>{
+    ctx.fillStyle="#111";
+    ctx.beginPath();
+    ctx.arc(
+      s.x-player.x*0.2,
+      s.y-player.y*0.2,
+      s.size,
+      0,Math.PI*2
+    );
+    ctx.fill();
+  });
+
+  ctx.restore();
+
+  // Eski draw (oyuncular)
+  _drawVisual();
+
+  // Oyuncu glow
+  ctx.save();
+  ctx.translate(canvas.width/2,canvas.height/2);
+
+  ctx.shadowBlur=25;
+  ctx.shadowColor="#0ff";
+  ctx.fillStyle="#0ff";
+  ctx.beginPath();
+  ctx.arc(0,0,18,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+};
+/* =========================
+   CHARACTER & BACKGROUND PRO UPGRADE
+========================= */
+
+// Neon grid arkaplan
+function drawBackground(){
+
+  ctx.fillStyle="#050510";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.strokeStyle="rgba(0,255,255,0.08)";
+  ctx.lineWidth=1;
+
+  const gridSize=60;
+
+  for(let x=-(player.x%gridSize); x<canvas.width; x+=gridSize){
+    ctx.beginPath();
+    ctx.moveTo(x,0);
+    ctx.lineTo(x,canvas.height);
+    ctx.stroke();
+  }
+
+  for(let y=-(player.y%gridSize); y<canvas.height; y+=gridSize){
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    ctx.lineTo(canvas.width,y);
+    ctx.stroke();
+  }
+}
+
+// Yeni karakter çizimi
+function drawPlayer(){
+
+  ctx.save();
+  ctx.translate(canvas.width/2,canvas.height/2);
+
+  // Glow aura
+  ctx.shadowBlur=25;
+  ctx.shadowColor="#0ff";
+
+  // Gövde
+  ctx.fillStyle="#0ff";
+  ctx.fillRect(-12,-18,24,36);
+
+  // Baş
+  ctx.beginPath();
+  ctx.arc(0,-28,12,0,Math.PI*2);
+  ctx.fill();
+
+  // Gözler
+  ctx.shadowBlur=0;
+  ctx.fillStyle="#000";
+  ctx.fillRect(-5,-32,4,4);
+  ctx.fillRect(1,-32,4,4);
+
+  ctx.restore();
+}
+
+// Remote player upgrade
+function drawRemotePlayer(p){
+
+  ctx.save();
+  ctx.translate(
+    canvas.width/2+(p.x-player.x),
+    canvas.height/2+(p.y-player.y)
+  );
+
+  ctx.shadowBlur=20;
+  ctx.shadowColor="#f0f";
+  ctx.fillStyle="#f0f";
+
+  ctx.fillRect(-12,-18,24,36);
+  ctx.beginPath();
+  ctx.arc(0,-28,12,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// DRAW override
+draw = function(){
+
+  drawBackground();
+
+  drawPlayer();
+
+  for(const id in remotePlayers){
+    drawRemotePlayer(remotePlayers[id]);
+  }
+};
+/* =========================
+   MOBILE ATTACK BUTTON
+========================= */
+
+const attackBtn=document.createElement("div");
+attackBtn.style.cssText=`
+position:fixed;
+bottom:40px;
+right:40px;
+width:70px;
+height:70px;
+border-radius:50%;
+background:rgba(255,0,255,0.2);
+border:2px solid #f0f;
+display:flex;
+align-items:center;
+justify-content:center;
+color:#f0f;
+font-weight:bold;
+`;
+attackBtn.innerText="⚔";
+document.body.appendChild(attackBtn);
+
+attackBtn.addEventListener("touchstart",()=>{
+  keys[" "]=true;
+});
+attackBtn.addEventListener("touchend",()=>{
+  keys[" "]=false;
+});
+
+</script>
+</body>
+</html>
