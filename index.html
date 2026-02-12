@@ -1620,6 +1620,168 @@ draw = function(){
 
 });
 });
+/* =========================
+   PVP SYSTEM (SECURE TRANSACTION)
+========================= */
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
+
+const { getDatabase, ref, runTransaction } = dbModule;
+
+const db = getDatabase();
+const ROOM = "world1";
+
+// PvP kontrol (melee alanında)
+function checkPvP() {
+  Object.entries(remotePlayers).forEach(([id, rp]) => {
+    const dist = Math.hypot(player.x - rp.x, player.y - rp.y);
+
+    if (dist < 40 && attackInput.melee) {
+      stealLevel(id);
+    }
+  });
+}
+
+// Güvenli level çalma
+function stealLevel(targetId) {
+  const targetRef = ref(db, "rooms/"+ROOM+"/players/"+targetId);
+
+  runTransaction(targetRef, currentData => {
+    if (currentData == null) return;
+
+    if (currentData.level > 1) {
+      const stolen = currentData.level;
+      currentData.level = 1;
+
+      // kazanana level ekle
+      player.level += stolen;
+
+      // kendi levelini DB'ye yaz
+      const myRef = ref(db, "rooms/"+ROOM+"/players/"+playerId);
+      runTransaction(myRef, myData => {
+        if (!myData) return;
+        myData.level = player.level;
+        return myData;
+      });
+
+      return currentData;
+    }
+
+    return currentData;
+  });
+}
+
+// Update zincirine bağla
+const _updatePvP = update;
+update = function(dt){
+  _updatePvP(dt);
+  checkPvP();
+};
+
+});
+/* =========================
+   GAME STATE + MAIN MENU
+========================= */
+
+let gameState = "menu";
+
+const menuScreen = document.createElement("div");
+menuScreen.style.cssText = `
+  position:fixed;
+  inset:0;
+  background:#000;
+  color:#0ff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  z-index:9999;
+`;
+menuScreen.innerHTML = `
+  <h1>NEON RISE ONLINE</h1>
+  <button id="startGame">START</button>
+`;
+document.body.appendChild(menuScreen);
+
+document.getElementById("startGame").onclick = () => {
+  gameState = "play";
+  menuScreen.style.display = "none";
+};
+
+const _updateState = update;
+update = function(dt){
+  if (gameState !== "play") return;
+  _updateState(dt);
+
+  if (player.health <= 0){
+    player.level = 1;
+    player.xp = 0;
+    player.health = player.maxHealth;
+    gameState = "menu";
+    menuScreen.style.display = "flex";
+  }
+};
+/* =========================
+   MINI BOSS SYSTEM
+========================= */
+
+function spawnMiniBoss(){
+  enemies.push({
+    type: "boss",
+    x: player.x + 300,
+    y: player.y,
+    size: 40,
+    speed: 60,
+    maxHealth: 500,
+    health: 500
+  });
+}
+
+setInterval(()=>{
+  if (player.level > 0 && player.level % 10 === 0){
+    spawnMiniBoss();
+  }
+}, 15000);
+/* =========================
+   SKIN DROP + WARDROBE
+========================= */
+
+player.inventory = [];
+player.equippedSkin = null;
+
+function dropSkin(){
+  const skin = "skin_" + Math.floor(Math.random()*1000);
+  player.inventory.push(skin);
+}
+
+function openWardrobe(){
+  const w = document.createElement("div");
+  w.style.cssText = `
+    position:fixed; inset:20%;
+    background:#000; color:#0ff;
+    border:2px solid #0ff;
+    overflow:auto;
+  `;
+  w.innerHTML = "<h3>DOLAP</h3>";
+
+  player.inventory.forEach(s=>{
+    const b = document.createElement("button");
+    b.textContent = s;
+    b.onclick = ()=> player.equippedSkin = s;
+    w.appendChild(b);
+  });
+
+  document.body.appendChild(w);
+}
+
+const wardrobeBtn = document.createElement("button");
+wardrobeBtn.textContent = "DOLAP";
+wardrobeBtn.style.position="fixed";
+wardrobeBtn.style.left="12px";
+wardrobeBtn.style.top="120px";
+document.body.appendChild(wardrobeBtn);
+
+wardrobeBtn.onclick = openWardrobe;
 
 </script>
 </body>
