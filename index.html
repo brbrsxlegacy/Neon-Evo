@@ -2311,6 +2311,111 @@ draw = function(){
 
   ctx.restore();
 };
+/* =========================
+   MAIN MENU MODULE
+========================= */
+
+(function createMainMenu(){
+
+  // eski menüyü gizle
+  const oldMenu = document.getElementById("menu");
+  if(oldMenu) oldMenu.style.display="none";
+
+  // yeni ana menü
+  const mainMenu = document.createElement("div");
+  mainMenu.id = "mainMenu";
+
+  mainMenu.style.cssText = `
+    position:fixed;
+    inset:0;
+    background:#000;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:20px;
+    z-index:9999;
+  `;
+
+  const title = document.createElement("h1");
+  title.innerText = "NEON RISE";
+  title.style.color="#0ff";
+
+  const playBtn = createBtn("▶ OYNA");
+  const marketBtn = createBtn("🛒 MARKET");
+  const wardrobeBtn = createBtn("👕 DOLAP");
+  const settingsBtn = createBtn("⚙ AYARLAR");
+
+  mainMenu.append(title, playBtn, marketBtn, wardrobeBtn, settingsBtn);
+  document.body.appendChild(mainMenu);
+
+  // PLAY → mode seçimi açar
+  playBtn.onclick = ()=> openModeMenu(mainMenu);
+
+})();
+
+function createBtn(text){
+  const btn=document.createElement("button");
+  btn.innerText=text;
+  btn.style.padding="10px 20px";
+  btn.style.fontSize="18px";
+  btn.style.cursor="pointer";
+  return btn;
+}
+/* =========================
+   MODE SELECTION MENU
+========================= */
+
+function openModeMenu(parentMenu){
+
+  parentMenu.innerHTML="";
+
+  const title = document.createElement("h2");
+  title.innerText="MOD SEÇ";
+  title.style.color="#0ff";
+
+  const onlineBtn = createBtn("🌐 ONLINE");
+  const localBtn = createBtn("🖥 LOCAL");
+  const backBtn = createBtn("← GERİ");
+
+  parentMenu.append(title, onlineBtn, localBtn, backBtn);
+
+  onlineBtn.onclick = ()=>{
+    parentMenu.remove();
+    joinRoom();
+  };
+
+  localBtn.onclick = ()=>{
+    parentMenu.remove();
+    startLocalMode();
+  };
+
+  backBtn.onclick = ()=>{
+    location.reload();
+  };
+}
+/* =========================
+   LOCAL MODE
+========================= */
+
+function startLocalMode(){
+
+  spawnLocalBots();
+
+}
+
+function spawnLocalBots(){
+
+  for(let i=0;i<6;i++){
+    remotePlayers["bot_"+i]={
+      x:Math.random()*800-400,
+      y:Math.random()*800-400,
+      level:Math.floor(Math.random()*10)+1,
+      hp:100
+    };
+  }
+
+}
 
 </script>
 </body>
