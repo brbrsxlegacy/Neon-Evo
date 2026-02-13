@@ -308,18 +308,31 @@ xp=0;
 level++;
 player.r+=1;
 player.speed+=0.2;
+levelFlash = 1;
+screenShake = 15;
 }
 
 document.getElementById("hud").innerHTML =
 "LEVEL: "+level+"<br>XP: "+xp;
 
 }
+if(levelFlash > 0) levelFlash -= 0.02;
+if(screenShake > 0) screenShake -= 0.8;
 
 /* ======================
    DRAW
 ====================== */
 
 function draw(){
+
+ctx.save();
+
+if(screenShake > 0){
+  ctx.translate(
+    Math.random()*screenShake - screenShake/2,
+    Math.random()*screenShake - screenShake/2
+  );
+}
 
 // background grid
 ctx.fillStyle="#02030a";
@@ -423,6 +436,15 @@ if(form==="god"){
   ctx.lineTo(player.x+player.r+22, player.y+10);
   ctx.stroke();
 }
+if(levelFlash > 0){
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.r + levelFlash*60, 0, Math.PI*2);
+  ctx.strokeStyle = "#00ffff";
+  ctx.lineWidth = 4;
+  ctx.globalAlpha = levelFlash;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
 
 // glow
 ctx.shadowColor=color;
@@ -453,6 +475,7 @@ ctx.fill();
 });
 
 }
+ctx.restore();
 
 /* ======================
    LOOP
@@ -478,6 +501,8 @@ function getEvolution(level){
   if(level>=5) return "core";
   return "base";
 }
+let levelFlash = 0;
+let screenShake = 0;
 
 </script>
 </body>
