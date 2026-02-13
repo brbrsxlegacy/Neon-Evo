@@ -345,11 +345,96 @@ ctx.arc(player.x,player.y,player.r+10,0,Math.PI*2);
 ctx.fillStyle="rgba(0,255,255,0.1)";
 ctx.fill();
 
-// player
+const form = getEvolution(level);
+
+let glow = 10;
+let color = "#00ffff";
+
+// evrim renkleri
+if(form==="core") glow=15;
+if(form==="energy") glow=25;
+if(form==="sun"){ color="#ffd000"; glow=35; }
+if(form==="orbit"){ color="#7ad6ff"; glow=30; }
+if(form==="portal"){ color="#b266ff"; glow=40; }
+if(form==="plasma"){ color="#00ffff"; glow=50; }
+if(form==="demon"){ color="#ff0033"; glow=55; }
+if(form==="god"){ color="#ffffff"; glow=65; }
+
+// aura
+ctx.beginPath();
+ctx.arc(player.x, player.y, player.r+10, 0, Math.PI*2);
+ctx.fillStyle = color;
+ctx.globalAlpha = 0.08;
+ctx.fill();
+ctx.globalAlpha = 1;
+
+// orbit halkası
+if(form==="orbit" || form==="portal"){
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.r+14, 0, Math.PI*2);
+  ctx.strokeStyle=color;
+  ctx.lineWidth=2;
+  ctx.stroke();
+}
+
+// güneş ışınları
+if(form==="sun"){
+  for(let i=0;i<8;i++){
+    const a = i*Math.PI/4;
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y);
+    ctx.lineTo(
+      player.x + Math.cos(a)*(player.r+18),
+      player.y + Math.sin(a)*(player.r+18)
+    );
+    ctx.strokeStyle=color;
+    ctx.stroke();
+  }
+}
+
+// demon boynuz
+if(form==="demon"){
+  ctx.fillStyle=color;
+  ctx.beginPath();
+  ctx.moveTo(player.x-8, player.y-player.r);
+  ctx.lineTo(player.x-2, player.y-player.r-12);
+  ctx.lineTo(player.x+2, player.y-player.r);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(player.x+8, player.y-player.r);
+  ctx.lineTo(player.x+2, player.y-player.r-12);
+  ctx.lineTo(player.x-2, player.y-player.r);
+  ctx.fill();
+}
+
+// GOD kanatları
+if(form==="god"){
+  ctx.strokeStyle=color;
+  ctx.beginPath();
+  ctx.moveTo(player.x-player.r-6, player.y);
+  ctx.lineTo(player.x-player.r-22, player.y-10);
+  ctx.lineTo(player.x-player.r-22, player.y+10);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(player.x+player.r+6, player.y);
+  ctx.lineTo(player.x+player.r+22, player.y-10);
+  ctx.lineTo(player.x+player.r+22, player.y+10);
+  ctx.stroke();
+}
+
+// glow
+ctx.shadowColor=color;
+ctx.shadowBlur=glow;
+
 ctx.beginPath();
 ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
-ctx.fillStyle=player.color;
+ctx.fillStyle=color;
 ctx.fill();
+
+ctx.shadowBlur=0;
+
 
 // enemies
 ctx.fillStyle="#ff2a6d";
@@ -381,6 +466,19 @@ draw();
 requestAnimationFrame(loop);
 }
 loop();
+
+function getEvolution(level){
+  if(level>=100) return "god";
+  if(level>=90) return "demon";
+  if(level>=70) return "plasma";
+  if(level>=50) return "portal";
+  if(level>=30) return "orbit";
+  if(level>=20) return "sun";
+  if(level>=10) return "energy";
+  if(level>=5) return "core";
+  return "base";
+}
+
 </script>
 </body>
 </html>
