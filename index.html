@@ -19,16 +19,42 @@ canvas{
 display:block;
 }
 
-#menu{
-position:absolute;
+#mainMenu{
+position:fixed;
 inset:0;
 display:flex;
 flex-direction:column;
-align-items:center;
 justify-content:center;
-background:radial-gradient(circle,#061020,#000);
-color:#00ffff;
+align-items:center;
+background:radial-gradient(circle at center,#03121f,#000);
+z-index:10;
 }
+
+#mainMenu h1{
+color:#00ffff;
+font-size:48px;
+margin-bottom:30px;
+text-shadow:0 0 25px #00ffff;
+}
+
+#mainMenu button{
+width:220px;
+margin:10px;
+padding:15px;
+font-size:18px;
+background:#001a22;
+color:#00ffff;
+border:2px solid #00ffff;
+cursor:pointer;
+box-shadow:0 0 15px #00ffff;
+transition:0.2s;
+}
+
+#mainMenu button:hover{
+transform:scale(1.05);
+box-shadow:0 0 30px #00ffff;
+}
+
 
 .btn{
 padding:14px 28px;
@@ -61,9 +87,39 @@ font-size:14px;
 
 <div class="hud" id="hud" style="display:none;"></div>
 
+<!-- MAIN MENU -->
+<div id="mainMenu">
+  <h1>NEON RISE</h1>
+
+  <button onclick="startLocal()">LOCAL GAME</button>
+  <button onclick="startOnline()">ONLINE</button>
+  <button onclick="openSettings()">SETTINGS</button>
+</div>
+
 <canvas id="game"></canvas>
 
 <script>
+
+
+function startLocal(){
+document.getElementById("mainMenu").style.display="none";
+startGame();
+}
+
+function startOnline(){
+alert("Online yakında 🔥");
+}
+
+function openSettings(){
+alert("Settings yakında");
+}
+document.addEventListener("keydown", e=>{
+if(e.key==="Escape"){
+gameRunning=false;
+document.getElementById("mainMenu").style.display="flex";
+}
+});
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
