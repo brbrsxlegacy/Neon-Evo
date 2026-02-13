@@ -18,6 +18,47 @@ touch-action:none;
 canvas{
 display:block;
 }
+#hud{
+position:fixed;
+top:15px;
+left:15px;
+width:220px;
+font-family:Arial;
+color:#00ffff;
+text-shadow:0 0 10px #00ffff;
+}
+
+#hpBar{
+width:100%;
+height:14px;
+background:#111;
+border:2px solid #00ffff;
+margin-bottom:6px;
+}
+
+#hpFill{
+height:100%;
+width:100%;
+background:#00ffaa;
+}
+
+#xpBar{
+width:100%;
+height:8px;
+background:#111;
+border:1px solid #00ffff;
+}
+
+#xpFill{
+height:100%;
+width:0%;
+background:#00ffff;
+}
+
+#levelText{
+margin-top:4px;
+font-size:14px;
+}
 
 #mainMenu{
 position:fixed;
@@ -86,6 +127,12 @@ font-size:14px;
 </div>
 
 <div class="hud" id="hud" style="display:none;"></div>
+
+<div id="hud">
+  <div id="hpBar"><div id="hpFill"></div></div>
+  <div id="xpBar"><div id="xpFill"></div></div>
+  <div id="levelText">LEVEL 1</div>
+</div>
 
 <!-- MAIN MENU -->
 <div id="mainMenu">
@@ -156,12 +203,15 @@ gameRunning = true;
 
 function initGame(){
 player = {
-x:canvas.width/2,
-y:canvas.height/2,
-r:18,
-speed:4,
-color:"#00ffff"
+x: canvas.width/2,
+y: canvas.height/2,
+r: 18,
+speed: 4,
+color:"#00ffff",
+hp:100,
+maxHp:100
 };
+
 
 enemies = [];
 bullets = [];
@@ -243,6 +293,15 @@ xp+=5;
 xpOrbs.splice(i,1);
 }
 });
+// HUD UPDATE
+document.getElementById("hpFill").style.width =
+(player.hp / player.maxHp * 100) + "%";
+
+document.getElementById("xpFill").style.width =
+(xp / (level*50) * 100) + "%";
+
+document.getElementById("levelText").innerText =
+"LEVEL " + level;
 
 if(xp>=level*50){
 xp=0;
