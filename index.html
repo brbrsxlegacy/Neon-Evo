@@ -3,37 +3,46 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NEON ETERNAL</title>
+<title>NEON OBLIVION ONLINE</title>
 <style>
 html,body{
-  margin:0;
-  padding:0;
-  overflow:hidden;
-  background:#05070f;
-  font-family:system-ui;
+  margin:0;padding:0;overflow:hidden;
+  background:#05070f;font-family:system-ui;
 }
-canvas{display:block;}
+canvas{display:block}
 #hud{
-  position:fixed;
-  top:10px;
-  left:10px;
-  color:#0ff;
-  font-size:13px;
+  position:fixed;left:10px;top:10px;
+  color:#0ff;font-size:12px;
+}
+.panel{
+  position:fixed;bottom:10px;left:50%;
+  transform:translateX(-50%);
+  background:#000;border:1px solid #0ff;
+  padding:8px;display:grid;
+  grid-template-columns:repeat(5,60px);
+  gap:4px;
+}
+.slot{
+  width:60px;height:60px;
+  background:#111;border:1px solid #0ff;
+  font-size:10px;color:#fff;
+  display:flex;align-items:center;justify-content:center;
 }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="hud"></div>
+<div id="inventory" class="panel"></div>
 
 <script type="module">
 
-/* =========================================================
-   FIREBASE LAYER
-========================================================= */
+/* ================= FIREBASE ================= */
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, remove, onDisconnect }
+import { initializeApp } from 
+"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+
+import { getDatabase, ref, set, onValue, onDisconnect, runTransaction }
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -49,9 +58,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/* =========================================================
-   CORE ENGINE
-========================================================= */
+/* ================= CANVAS ================= */
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -63,119 +70,215 @@ function resize(){
 resize();
 addEventListener("resize",resize);
 
-let last=0, dt=0;
+/* ================= GAME LOOP ================= */
+
+let last=0,dt=0;
 
 function loop(t){
   dt=(t-last)/1000;
   last=t;
 
-  ECS.update(dt);
-  ECS.draw();
+  Systems.update(dt);
+  Systems.draw();
 
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
-/* =========================================================
-   INPUT SYSTEM
-========================================================= */
+/* ================= INPUT ================= */
 
-const Input = {
-  keys:{},
-  mouse:{x:0,y:0,down:false}
-};
-
+const Input={keys:{},mouse:{x:0,y:0}};
 addEventListener("keydown",e=>Input.keys[e.key]=true);
 addEventListener("keyup",e=>Input.keys[e.key]=false);
 addEventListener("mousemove",e=>{
   Input.mouse.x=e.clientX;
   Input.mouse.y=e.clientY;
 });
-addEventListener("mousedown",()=>Input.mouse.down=true);
-addEventListener("mouseup",()=>Input.mouse.down=false);
 
-/* =========================================================
-   ECS (ENTITY COMPONENT SYSTEM)
-========================================================= */
+/* ================= ECS ================= */
 
-const ECS = {
+const ECS={
   entities:[],
-  components:{
-    position:new Map(),
-    velocity:new Map(),
-    render:new Map(),
-    collider:new Map(),
-    health:new Map(),
+  c:{
+    pos:new Map(),
+    vel:new Map(),
+    rend:new Map(),
+    hp:new Map(),
     player:new Map(),
     enemy:new Map(),
     bullet:new Map()
   },
-
   create(){
-    const id = crypto.randomUUID();
+    const id=crypto.randomUUID();
     this.entities.push(id);
     return id;
   },
-
   remove(id){
     this.entities=this.entities.filter(e=>e!==id);
-    for(const comp in this.components){
-      this.components[comp].delete(id);
-    }
-  },
+    for(const k in this.c) this.c[k].delete(id);
+  }
+};
+
+/* ================= PLAYER ================= */
+
+const Player={id:null,level:1,xp:0,xpNext:100};
+
+function createPlayer(){
+  const id=ECS.create();
+  ECS.c.pos.set(id,{x:0,y:0});
+  ECS.c.vel.set(id,{x:0,y:0});
+  ECS.c.rend.set(id,{c:"#0ff",s:20});
+  ECS.c.hp.set(id,{v:100,max:100});
+  ECS.c.player.set(id,{});
+  Player.id=id;
+}
+createPlayer();
+
+/* ================= ENEMIES ================= */
+
+function spawnEnemy(){
+  const id=ECS.create();
+  const p=ECS.c.pos.get(Player.id);
+  ECS.c.pos.set(id,{
+    x:p.x+Math.random()*600-300,
+    y:p.y+Math.random()*600-300
+  });
+  ECS.c.rend.set(id,{c:"#f33",s:18});
+  ECS.c.hp.set(id,{v:60,max:60});
+  ECS.c.enemy.set(id,{});
+}
+setInterval(spawnEnemy,2000);
+
+/* ================= SHOOT ================= */
+
+addEventListener("click",()=>{
+  const id=ECS.create();
+  const p=ECS.c.pos.get(Player.id);
+
+  const angle=Math.atan2(
+    Input.mouse.y-canvas.height/2,
+    Input.mouse.x-canvas.width/2
+  );
+
+  ECS.c.pos.set(id,{x:p.x,y:p.y});
+  ECS.c.vel.set(id,{
+    x:Math.cos(angle)*400,
+    y:Math.sin(angle)*400
+  });
+  ECS.c.rend.set(id,{c:"#6cf",s:6});
+  ECS.c.bullet.set(id,{});
+});
+
+/* ================= INVENTORY ================= */
+
+const Inventory={items:Array(20).fill(null)};
+
+function initInventory(){
+  const inv=document.getElementById("inventory");
+  Inventory.items.forEach((_,i)=>{
+    const slot=document.createElement("div");
+    slot.className="slot";
+    slot.dataset.i=i;
+    inv.appendChild(slot);
+  });
+}
+initInventory();
+
+function renderInventory(){
+  document.querySelectorAll(".slot").forEach((s,i)=>{
+    const item=Inventory.items[i];
+    s.textContent=item?item.name:"";
+  });
+}
+
+/* ================= LOOT ================= */
+
+function generateLoot(){
+  const rar=Math.random();
+  let r="COMMON";
+  if(r>0.9) r="LEGENDARY";
+  else if(r>0.7) r="EPIC";
+  else if(r>0.5) r="RARE";
+  return {name:r+" Blade",rarity:r};
+}
+
+/* ================= SKILL TREE ================= */
+
+const Skills={
+  points:0,
+  dmg:0,
+  speed:0,
+  vit:0
+};
+
+function levelUp(){
+  Player.level++;
+  Player.xp=0;
+  Player.xpNext=Math.floor(Player.xpNext*1.3);
+  Skills.points++;
+}
+
+/* ================= SYSTEMS ================= */
+
+const Systems={
 
   update(dt){
-    Systems.movement(dt);
-    Systems.combat(dt);
-    Systems.enemyAI(dt);
-    Systems.collision(dt);
-    Systems.cleanup();
-    Systems.firebaseSync();
+    this.control();
+    this.movement(dt);
+    this.combat(dt);
+    this.enemyAI(dt);
+    this.collision();
+    this.network();
+    this.hud();
   },
 
   draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    Systems.camera();
-    Systems.render();
-    Systems.hud();
-  }
-};
-
-/* =========================================================
-   SYSTEMS
-========================================================= */
-
-const Systems = {
-
-  camera(){
     ctx.save();
-    const p = Player.id;
-    const pos = ECS.components.position.get(p);
-    ctx.translate(canvas.width/2 - pos.x, canvas.height/2 - pos.y);
+    const p=ECS.c.pos.get(Player.id);
+    ctx.translate(canvas.width/2-p.x,canvas.height/2-p.y);
+
+    for(const [id,pos] of ECS.c.pos){
+      const r=ECS.c.rend.get(id);
+      ctx.fillStyle=r.c;
+      ctx.beginPath();
+      ctx.arc(pos.x,pos.y,r.s,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  control(){
+    const vel=ECS.c.vel.get(Player.id);
+    vel.x=0; vel.y=0;
+    const speed=200+Skills.speed*20;
+    if(Input.keys["w"]) vel.y=-speed;
+    if(Input.keys["s"]) vel.y=speed;
+    if(Input.keys["a"]) vel.x=-speed;
+    if(Input.keys["d"]) vel.x=speed;
   },
 
   movement(dt){
-    for(const [id,pos] of ECS.components.position){
-      const vel = ECS.components.velocity.get(id);
+    for(const [id,pos] of ECS.c.pos){
+      const vel=ECS.c.vel.get(id);
       if(!vel) continue;
-      pos.x += vel.x * dt;
-      pos.y += vel.y * dt;
+      pos.x+=vel.x*dt;
+      pos.y+=vel.y*dt;
     }
   },
 
   combat(dt){
-    for(const [id,b] of ECS.components.bullet){
-      const pos = ECS.components.position.get(id);
-      const vel = ECS.components.velocity.get(id);
-      pos.x += vel.x*dt;
-      pos.y += vel.y*dt;
+    for(const [id,_] of ECS.c.bullet){
+      const pos=ECS.c.pos.get(id);
+      const vel=ECS.c.vel.get(id);
+      pos.x+=vel.x*dt;
+      pos.y+=vel.y*dt;
 
-      for(const [eid,e] of ECS.components.enemy){
-        const epos = ECS.components.position.get(eid);
-        const dist = Math.hypot(pos.x-epos.x,pos.y-epos.y);
-        if(dist<20){
-          const hp = ECS.components.health.get(eid);
-          hp.value -= 20;
+      for(const [eid,_] of ECS.c.enemy){
+        const epos=ECS.c.pos.get(eid);
+        if(Math.hypot(pos.x-epos.x,pos.y-epos.y)<20){
+          const hp=ECS.c.hp.get(eid);
+          hp.v-=20+Skills.dmg*5;
           ECS.remove(id);
         }
       }
@@ -183,532 +286,277 @@ const Systems = {
   },
 
   enemyAI(dt){
-    for(const [id,e] of ECS.components.enemy){
-      const pos = ECS.components.position.get(id);
-      const ppos = ECS.components.position.get(Player.id);
-      const dx = ppos.x-pos.x;
-      const dy = ppos.y-pos.y;
-      const d = Math.hypot(dx,dy);
-      pos.x += (dx/d)*80*dt;
-      pos.y += (dy/d)*80*dt;
+    for(const [id,_] of ECS.c.enemy){
+      const pos=ECS.c.pos.get(id);
+      const p=ECS.c.pos.get(Player.id);
+      const dx=p.x-pos.x;
+      const dy=p.y-pos.y;
+      const d=Math.hypot(dx,dy)||1;
+      pos.x+=(dx/d)*80*dt;
+      pos.y+=(dy/d)*80*dt;
     }
   },
 
   collision(){
-    for(const [id,h] of ECS.components.health){
-      if(h.value<=0){
+    for(const [id,h] of ECS.c.hp){
+      if(h.v<=0){
+        if(ECS.c.enemy.has(id)){
+          Player.xp+=20;
+          if(Player.xp>=Player.xpNext) levelUp();
+          Inventory.items[
+            Inventory.items.findIndex(x=>x==null)
+          ]=generateLoot();
+          renderInventory();
+        }
         ECS.remove(id);
       }
     }
   },
 
-  cleanup(){
-    // gelecekte particle cleanup burada
-  },
-
-  render(){
-    for(const [id,pos] of ECS.components.position){
-      const rend = ECS.components.render.get(id);
-      if(!rend) continue;
-
-      ctx.fillStyle = rend.color;
-      ctx.beginPath();
-      ctx.arc(pos.x,pos.y,rend.size,0,Math.PI*2);
-      ctx.fill();
-    }
-    ctx.restore();
-  },
-
   hud(){
-    const hp = ECS.components.health.get(Player.id);
+    const hp=ECS.c.hp.get(Player.id);
     document.getElementById("hud").innerHTML=
-      `HP: ${Math.floor(hp.value)}`;
+      "HP:"+Math.floor(hp.v)+
+      "<br>LV:"+Player.level+
+      "<br>XP:"+Player.xp+"/"+Player.xpNext+
+      "<br>SP:"+Skills.points;
   },
 
-  firebaseSync(){
+  network(){
     if(!Network.room) return;
-    const pos = ECS.components.position.get(Player.id);
-    set(Network.myRef,{
-      x:pos.x,
-      y:pos.y
-    });
+    const pos=ECS.c.pos.get(Player.id);
+    set(Network.myRef,{x:pos.x,y:pos.y});
   }
 };
 
-/* =========================================================
-   PLAYER ENTITY
-========================================================= */
+/* ================= NETWORK ================= */
 
-const Player = {
-  id:null
-};
-
-function createPlayer(){
-  const id = ECS.create();
-  ECS.components.position.set(id,{x:0,y:0});
-  ECS.components.velocity.set(id,{x:0,y:0});
-  ECS.components.render.set(id,{color:"#0ff",size:20});
-  ECS.components.health.set(id,{value:100});
-  ECS.components.player.set(id,{});
-  Player.id=id;
-}
-
-createPlayer();
-
-/* =========================================================
-   PLAYER CONTROL SYSTEM
-========================================================= */
-
-function playerControl(){
-  const vel = ECS.components.velocity.get(Player.id);
-  vel.x=0; vel.y=0;
-
-  if(Input.keys["w"]) vel.y=-200;
-  if(Input.keys["s"]) vel.y=200;
-  if(Input.keys["a"]) vel.x=-200;
-  if(Input.keys["d"]) vel.x=200;
-}
-setInterval(playerControl,16);
-
-/* =========================================================
-   ENEMY SPAWN
-========================================================= */
-
-function spawnEnemy(){
-  const id = ECS.create();
-  const ppos = ECS.components.position.get(Player.id);
-  ECS.components.position.set(id,{
-    x:ppos.x+Math.random()*600-300,
-    y:ppos.y+Math.random()*600-300
-  });
-  ECS.components.render.set(id,{color:"#f33",size:18});
-  ECS.components.health.set(id,{value:60});
-  ECS.components.enemy.set(id,{});
-}
-
-setInterval(spawnEnemy,2000);
-
-/* =========================================================
-   SHOOTING SYSTEM
-========================================================= */
-
-addEventListener("click",()=>{
-  const id = ECS.create();
-  const ppos = ECS.components.position.get(Player.id);
-
-  const angle = Math.atan2(
-    Input.mouse.y-canvas.height/2,
-    Input.mouse.x-canvas.width/2
-  );
-
-  ECS.components.position.set(id,{x:ppos.x,y:ppos.y});
-  ECS.components.velocity.set(id,{
-    x:Math.cos(angle)*400,
-    y:Math.sin(angle)*400
-  });
-  ECS.components.render.set(id,{color:"#6cf",size:6});
-  ECS.components.bullet.set(id,{});
-});
-
-/* =========================================================
-   NETWORK SYSTEM
-========================================================= */
-
-const Network={
-  room:null,
-  myRef:null,
-  remote:{}
-};
+const Network={room:null,myRef:null};
 
 function createRoom(){
-  Network.room="room_"+Math.random().toString(36).substr(2,5);
-  joinRoom(Network.room);
-}
-
-function joinRoom(name){
-  Network.room=name;
-  Network.myRef=ref(db,"rooms/"+name+"/players/"+crypto.randomUUID());
+  const r="room_"+Math.random().toString(36).substr(2,5);
+  Network.room=r;
+  Network.myRef=ref(db,"rooms/"+r+"/players/"+crypto.randomUUID());
   set(Network.myRef,{x:0,y:0});
   onDisconnect(Network.myRef).remove();
+}
+createRoom();
 
-  onValue(ref(db,"rooms/"+name+"/players"),snap=>{
-    Network.remote=snap.val()||{};
-  });
+/* ================= MATCH TIMER ================= */
+
+let match=300;
+setInterval(()=>{
+  match--;
+  if(match<=0) alert("Match Over");
+},1000);
+
+/* ================= BATTLE PASS ================= */
+
+const BP={xp:0,tier:1};
+function gainBP(v){
+  BP.xp+=v;
+  if(BP.xp>100){BP.tier++;BP.xp=0;}
 }
 
-/* =========================================================
-   PROCEDURAL DUNGEON
-========================================================= */
+/* ================= ANTI CHEAT ================= */
 
-const Dungeon = {
-  tiles:[],
-  size:50,
+setInterval(()=>{
+  const hp=ECS.c.hp.get(Player.id);
+  if(hp.v>200) hp.v=200;
+},2000);
+/* ======================================================
+   GRID + A* PATHFINDING
+====================================================== */
 
+const Grid = {
+  size:60,
+  cell:80,
+  map:[],
   generate(){
-    this.tiles=[];
+    this.map=[];
     for(let y=0;y<this.size;y++){
       const row=[];
       for(let x=0;x<this.size;x++){
-        row.push(Math.random()>0.2?1:0);
+        row.push(Math.random()>0.15?0:1);
       }
-      this.tiles.push(row);
+      this.map.push(row);
     }
   },
-
-  draw(){
-    for(let y=0;y<this.size;y++){
-      for(let x=0;x<this.size;x++){
-        if(this.tiles[y][x]===0){
-          ctx.fillStyle="#111";
-          ctx.fillRect(x*80,y*80,80,80);
-        }
-      }
-    }
+  walkable(x,y){
+    if(x<0||y<0||x>=this.size||y>=this.size) return false;
+    return this.map[y][x]===0;
   }
 };
+Grid.generate();
 
-Dungeon.generate();
-
-/* =========================================================
-   INITIAL ROOM
-========================================================= */
-
-createRoom();
-/* =========================================================
-   SKILL TREE SYSTEM
-========================================================= */
-
-const SkillTree = {
-  points:0,
-  skills:{
-    damage:{level:0,max:5},
-    speed:{level:0,max:5},
-    vitality:{level:0,max:5}
-  },
-
-  gainPoint(){
-    this.points++;
-  },
-
-  upgrade(name){
-    if(this.points<=0) return;
-    const s=this.skills[name];
-    if(!s) return;
-    if(s.level>=s.max) return;
-
-    s.level++;
-    this.points--;
-
-    if(name==="damage"){
-      Player.damage = (Player.damage||20)+5;
-    }
-    if(name==="speed"){
-      const vel = ECS.components.velocity.get(Player.id);
-      vel.maxSpeed = (vel.maxSpeed||200)+20;
-    }
-    if(name==="vitality"){
-      const hp = ECS.components.health.get(Player.id);
-      hp.value += 20;
-    }
-  }
-};
-
-/* =========================================================
-   INVENTORY + LOOT
-========================================================= */
-
-const Inventory = {
-  slots:20,
-  items:[],
-
-  add(item){
-    if(this.items.length>=this.slots) return false;
-    this.items.push(item);
-    return true;
-  }
-};
-
-function generateLoot(){
-  const rarityRoll=Math.random();
-
-  let rarity="COMMON";
-  if(rarityRoll>0.9) rarity="LEGENDARY";
-  else if(rarityRoll>0.75) rarity="EPIC";
-  else if(rarityRoll>0.5) rarity="RARE";
-
-  return {
-    name:rarity+" Blade",
-    rarity,
-    power:Math.floor(Math.random()*20)+10
-  };
+function heuristic(a,b){
+  return Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
 }
 
-/* =========================================================
-   BOSS SYSTEM (3 PHASE)
-========================================================= */
+function astar(start,end){
+  const open=[{...start,g:0,f:0,parent:null}];
+  const closed=new Set();
+
+  while(open.length){
+    open.sort((a,b)=>a.f-b.f);
+    const current=open.shift();
+    const key=current.x+","+current.y;
+    if(current.x===end.x&&current.y===end.y){
+      const path=[];
+      let n=current;
+      while(n){path.push(n);n=n.parent;}
+      return path.reverse();
+    }
+    closed.add(key);
+
+    const dirs=[
+      {x:1,y:0},{x:-1,y:0},
+      {x:0,y:1},{x:0,y:-1}
+    ];
+
+    for(const d of dirs){
+      const nx=current.x+d.x;
+      const ny=current.y+d.y;
+      if(!Grid.walkable(nx,ny)) continue;
+      const nKey=nx+","+ny;
+      if(closed.has(nKey)) continue;
+      const g=current.g+1;
+      const h=heuristic({x:nx,y:ny},end);
+      open.push({
+        x:nx,y:ny,g,f:g+h,parent:current
+      });
+    }
+  }
+  return [];
+}
+
+/* ======================================================
+   BOSS 3 PHASE SYSTEM
+====================================================== */
 
 function spawnBoss(){
   const id=ECS.create();
-  const ppos=ECS.components.position.get(Player.id);
-
-  ECS.components.position.set(id,{
-    x:ppos.x+400,
-    y:ppos.y
-  });
-
-  ECS.components.render.set(id,{color:"#f0f",size:40});
-  ECS.components.health.set(id,{value:500});
-  ECS.components.enemy.set(id,{boss:true,phase:1});
-
-  return id;
+  const p=ECS.c.pos.get(Player.id);
+  ECS.c.pos.set(id,{x:p.x+400,y:p.y});
+  ECS.c.rend.set(id,{c:"#f0f",s:40});
+  ECS.c.hp.set(id,{v:500,max:500});
+  ECS.c.enemy.set(id,{boss:true,phase:1});
 }
 
-function bossAI(){
-  for(const [id,e] of ECS.components.enemy){
+function bossAI(dt){
+  for(const [id,e] of ECS.c.enemy){
     if(!e.boss) continue;
+    const hp=ECS.c.hp.get(id);
+    const pos=ECS.c.pos.get(id);
+    const p=ECS.c.pos.get(Player.id);
 
-    const hp=ECS.components.health.get(id);
-    const pos=ECS.components.position.get(id);
-    const ppos=ECS.components.position.get(Player.id);
+    if(hp.v<350) e.phase=2;
+    if(hp.v<150) e.phase=3;
 
-    if(hp.value<350) e.phase=2;
-    if(hp.value<150) e.phase=3;
+    const dx=p.x-pos.x;
+    const dy=p.y-pos.y;
 
     if(e.phase===1){
-      pos.x+=(ppos.x-pos.x)*0.01;
-      pos.y+=(ppos.y-pos.y)*0.01;
+      pos.x+=dx*0.01;
+      pos.y+=dy*0.01;
     }
-
     if(e.phase===2){
-      pos.x+=(ppos.x-pos.x)*0.02;
-      pos.y+=(ppos.y-pos.y)*0.02;
+      pos.x+=dx*0.02;
+      pos.y+=dy*0.02;
       if(Math.random()<0.02) spawnEnemy();
     }
-
     if(e.phase===3){
-      pos.x+=(ppos.x-pos.x)*0.03;
-      pos.y+=(ppos.y-pos.y)*0.03;
+      pos.x+=dx*0.03;
+      pos.y+=dy*0.03;
     }
   }
 }
+setInterval(()=>bossAI(dt),50);
+setInterval(spawnBoss,60000);
 
-setInterval(spawnBoss,30000);
-setInterval(bossAI,16);
+/* ======================================================
+   PARTY SYSTEM
+====================================================== */
 
-/* =========================================================
-   PvP DAMAGE SYSTEM
-========================================================= */
-
-function pvpCheck(){
-  for(const id in Network.remote){
-    const remote=Network.remote[id];
-    const ppos=ECS.components.position.get(Player.id);
-    const d=Math.hypot(ppos.x-remote.x,ppos.y-remote.y);
-
-    if(d<40){
-      const hp=ECS.components.health.get(Player.id);
-      hp.value-=10*dt;
+const Party={
+  members:[Player.id],
+  invite(id){
+    if(this.members.length<4){
+      this.members.push(id);
     }
   }
-}
-setInterval(pvpCheck,16);
-
-/* =========================================================
-   CLAN SYSTEM
-========================================================= */
-
-const Clan = {
-  name:null,
-  members:[]
 };
 
+/* ======================================================
+   CLAN SYSTEM (FIREBASE)
+====================================================== */
+
 function createClan(name){
-  Clan.name=name;
+  set(ref(db,"clans/"+name+"/members/"+Player.id),true);
 }
 
 function joinClan(name){
-  Clan.name=name;
+  set(ref(db,"clans/"+name+"/members/"+Player.id),true);
 }
 
-/* =========================================================
-   CHAT SYSTEM
-========================================================= */
+/* ======================================================
+   SECURE PvP
+====================================================== */
 
-const Chat = {
-  messages:[]
-};
+function securePvP(targetId){
+  const targetRef=ref(
+    db,
+    "rooms/"+Network.room+"/players/"+targetId+"/hp"
+  );
 
-function sendMessage(text){
-  Chat.messages.push(text);
+  runTransaction(targetRef,(hp)=>{
+    if(hp==null) return 100;
+    return hp-15;
+  });
 }
 
-/* =========================================================
-   LEADERBOARD SYSTEM
-========================================================= */
+/* ======================================================
+   MARKET SYSTEM
+====================================================== */
 
-const Leaderboard = {
-  scores:{}
-};
-
-function updateLeaderboard(){
-  Leaderboard.scores[game.playerId]={
-    level:1
-  };
-}
-
-/* =========================================================
-   ANTI-CHEAT
-========================================================= */
-
-setInterval(()=>{
-  const hp=ECS.components.health.get(Player.id);
-  if(hp.value>200) hp.value=200;
-},3000);
-
-/* =========================================================
-   ADVANCED PARTICLE ENGINE
-========================================================= */
-
-function spawnExplosion(x,y){
-  for(let i=0;i<30;i++){
-    particles.push({
-      x,y,
-      vx:(Math.random()-0.5)*500,
-      vy:(Math.random()-0.5)*500,
-      life:1,
-      color:"#ff0"
-    });
-  }
-}
-
-/* =========================================================
-   ACHIEVEMENTS
-========================================================= */
-
-const Achievements={
-  bossSlayer:false
-};
-
-function checkAchievements(){
-  if(!Achievements.bossSlayer){
-    Achievements.bossSlayer=true;
-  }
-}
-setInterval(checkAchievements,5000);
-
-/* =========================================================
-   DAILY REWARD
-========================================================= */
-
-function dailyReward(){
-  const last=localStorage.getItem("daily");
-  const now=Date.now();
-  if(!last||now-last>86400000){
-    Inventory.add(generateLoot());
-    localStorage.setItem("daily",now);
-  }
-}
-dailyReward();
-
-/* =========================================================
-   SAVE / LOAD
-========================================================= */
-
-function saveGame(){
-  localStorage.setItem("save",JSON.stringify({
-    inventory:Inventory.items
-  }));
-}
-
-function loadGame(){
-  const data=JSON.parse(localStorage.getItem("save")||"{}");
-  if(data.inventory) Inventory.items=data.inventory;
-}
-loadGame();
-
-setInterval(saveGame,10000);
-/* =========================================================
-   EVENT BUS
-========================================================= */
-
-const EventBus = {
-  events:{},
-
-  on(name,fn){
-    if(!this.events[name]) this.events[name]=[];
-    this.events[name].push(fn);
+const Market={
+  list:[],
+  sell(item){
+    this.list.push(item);
   },
-
-  emit(name,data){
-    if(!this.events[name]) return;
-    this.events[name].forEach(fn=>fn(data));
+  buy(index){
+    const item=this.list[index];
+    if(item){
+      Inventory.items[
+        Inventory.items.findIndex(x=>x==null)
+      ]=item;
+      this.list.splice(index,1);
+      renderInventory();
+    }
   }
 };
-/* =========================================================
-   SPATIAL GRID (Collision Optimization)
-========================================================= */
 
-const SpatialGrid = {
-  cellSize:100,
-  cells:{},
+/* ======================================================
+   ABILITIES + COOLDOWN
+====================================================== */
 
-  clear(){
-    this.cells={};
-  },
-
-  insert(id,pos){
-    const cx=Math.floor(pos.x/this.cellSize);
-    const cy=Math.floor(pos.y/this.cellSize);
-    const key=cx+","+cy;
-    if(!this.cells[key]) this.cells[key]=[];
-    this.cells[key].push(id);
-  },
-
-  query(pos){
-    const cx=Math.floor(pos.x/this.cellSize);
-    const cy=Math.floor(pos.y/this.cellSize);
-    const key=cx+","+cy;
-    return this.cells[key]||[];
-  }
-};
-/* =========================================================
-   DAMAGE CALCULATOR
-========================================================= */
-
-function calculateDamage(base,critChance=0.1){
-  let dmg=base;
-  if(Math.random()<critChance){
-    dmg*=2;
-  }
-  return dmg;
-}
-/* =========================================================
-   ABILITY SYSTEM
-========================================================= */
-
-const Abilities = {
-  list:{
-    fireball:{cooldown:3,last:0},
-    dash:{cooldown:5,last:0}
-  },
+const Abilities={
+  fireball:{cd:3,last:0},
+  dash:{cd:5,last:0},
 
   use(name){
-    const a=this.list[name];
-    if(!a) return;
+    const a=this[name];
     const now=performance.now()/1000;
-    if(now-a.last<a.cooldown) return;
-
+    if(now-a.last<a.cd) return;
     a.last=now;
 
     if(name==="fireball"){
-      spawnExplosion(
-        ECS.components.position.get(Player.id).x,
-        ECS.components.position.get(Player.id).y
-      );
+      for(let i=0;i<10;i++){
+        spawnEnemy();
+      }
     }
-
     if(name==="dash"){
-      const vel=ECS.components.velocity.get(Player.id);
+      const vel=ECS.c.vel.get(Player.id);
       vel.x*=3;
       vel.y*=3;
     }
@@ -719,748 +567,69 @@ addEventListener("keydown",e=>{
   if(e.key==="1") Abilities.use("fireball");
   if(e.key==="2") Abilities.use("dash");
 });
-/* =========================================================
-   STATE MACHINE AI
-========================================================= */
 
-function enemyStateMachine(){
-  for(const [id,e] of ECS.components.enemy){
-    if(e.state==="idle"){
-      e.state="chase";
-    }
+/* ======================================================
+   FLOATING DAMAGE
+====================================================== */
 
-    if(e.state==="chase"){
-      const pos=ECS.components.position.get(id);
-      const ppos=ECS.components.position.get(Player.id);
-      const d=Math.hypot(ppos.x-pos.x,ppos.y-pos.y);
-      if(d<50) e.state="attack";
-    }
+const Floating=[];
 
-    if(e.state==="attack"){
-      const hp=ECS.components.health.get(Player.id);
-      hp.value-=5*dt;
-    }
-  }
-}
-setInterval(enemyStateMachine,100);
-/* =========================================================
-   A* PATHFINDING (BASIC GRID)
-========================================================= */
-
-function heuristic(a,b){
-  return Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+function spawnFloating(x,y,text){
+  Floating.push({x,y,text,life:1});
 }
 
-function findPath(start,end){
-  return [start,end]; // placeholder simplified
-}
-/* =========================================================
-   SECURE PvP (Firebase Transaction)
-========================================================= */
-
-import { runTransaction } from 
-"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
-function securePvP(targetId){
-  const targetRef=ref(db,"rooms/"+Network.room+"/players/"+targetId);
-
-  runTransaction(targetRef,(data)=>{
-    if(data){
-      data.hp=(data.hp||100)-10;
-    }
-    return data;
-  });
-}
-/* =========================================================
-   MATCH TIMER
-========================================================= */
-
-let matchTime=300;
-
-setInterval(()=>{
-  matchTime--;
-  if(matchTime<=0){
-    EventBus.emit("matchEnd");
-  }
-},1000);
-/* =========================================================
-   RANKED MATCHMAKING
-========================================================= */
-
-const Matchmaking={
-  queue:[],
-
-  join(playerId){
-    this.queue.push(playerId);
-    if(this.queue.length>=2){
-      const p1=this.queue.shift();
-      const p2=this.queue.shift();
-      console.log("Match:",p1,p2);
-    }
-  }
-};
-/* =========================================================
-   BATTLE PASS
-========================================================= */
-
-const BattlePass={
-  xp:0,
-  tier:1,
-
-  gain(v){
-    this.xp+=v;
-    if(this.xp>100){
-      this.tier++;
-      this.xp=0;
-    }
-  }
-};
-/* =========================================================
-   DRAG & DROP INVENTORY
-========================================================= */
-
-document.addEventListener("dragstart",e=>{
-  e.dataTransfer.setData("text/plain",e.target.dataset.slot);
-});
-
-document.addEventListener("drop",e=>{
-  e.preventDefault();
-});
-/* =========================================================
-   ADVANCED EFFECTS
-========================================================= */
-
-function screenFlash(){
-  ctx.fillStyle="rgba(255,255,255,0.1)";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-}
-/* =========================================================
-   SERVER AUTHORITY SIMULATION LAYER
-   (Client prediction + server correction)
-========================================================= */
-
-const ServerSim = {
-  latency: 80, // ms simülasyon
-  buffer: [],
-  lastServerState: null,
-
-  sendInput(input){
-    this.buffer.push({
-      time: performance.now(),
-      input
-    });
-  },
-
-  applyServerState(state){
-    this.lastServerState = state;
-
-    const pos = ECS.components.position.get(Player.id);
-    if(!pos) return;
-
-    // server correction
-    pos.x = state.x;
-    pos.y = state.y;
-  }
-};
-
-/* =========================================================
-   CLIENT PREDICTION
-========================================================= */
-
-function predictedMovement(dt){
-  const vel = ECS.components.velocity.get(Player.id);
-  const pos = ECS.components.position.get(Player.id);
-
-  if(!vel || !pos) return;
-
-  pos.x += vel.x * dt;
-  pos.y += vel.y * dt;
-}
-
-setInterval(()=>{
-  if(!Network.room) return;
-
-  const pos = ECS.components.position.get(Player.id);
-  if(!pos) return;
-
-  // simulate server delay
-  setTimeout(()=>{
-    ServerSim.applyServerState({
-      x: pos.x,
-      y: pos.y
-    });
-  }, ServerSim.latency);
-
-},100);
-
-/* =========================================================
-   SYNC OPTIMIZATION (Delta Compression)
-========================================================= */
-
-const Sync = {
-  lastSent:{x:0,y:0},
-
-  send(){
-    if(!Network.room) return;
-
-    const pos = ECS.components.position.get(Player.id);
-    if(!pos) return;
-
-    if(
-      Math.abs(pos.x-this.lastSent.x)>1 ||
-      Math.abs(pos.y-this.lastSent.y)>1
-    ){
-      set(Network.myRef,{
-        x:pos.x,
-        y:pos.y
-      });
-
-      this.lastSent.x = pos.x;
-      this.lastSent.y = pos.y;
-    }
-  }
-};
-
-setInterval(()=>Sync.send(),50);
-
-/* =========================================================
-   REMOTE PLAYER RENDER LAYER
-========================================================= */
-
-function renderRemotePlayers(){
-  for(const id in Network.remote){
-    const p = Network.remote[id];
-    if(!p) continue;
-
-    ctx.fillStyle="#ff00ff";
-    ctx.beginPath();
-    ctx.arc(p.x,p.y,18,0,Math.PI*2);
-    ctx.fill();
-  }
-}
-
-/* =========================================================
-   NETWORK CLEANUP
-========================================================= */
-
-function cleanupDisconnected(){
-  for(const id in Network.remote){
-    if(!Network.remote[id]){
-      delete Network.remote[id];
-    }
-  }
-}
-setInterval(cleanupDisconnected,3000);
-
-/* =========================================================
-   SERVER VALIDATION (BASIC)
-========================================================= */
-
-function validateMovement(){
-  const vel = ECS.components.velocity.get(Player.id);
-  if(!vel) return;
-
-  const maxSpeed = 400;
-  if(Math.abs(vel.x)>maxSpeed) vel.x = Math.sign(vel.x)*maxSpeed;
-  if(Math.abs(vel.y)>maxSpeed) vel.y = Math.sign(vel.y)*maxSpeed;
-}
-setInterval(validateMovement,100);
-
-/* =========================================================
-   MATCH STATE SYSTEM
-========================================================= */
-
-const MatchState = {
-  state:"waiting",
-  playersReady:0
-};
-
-function startMatch(){
-  if(MatchState.playersReady>=2){
-    MatchState.state="playing";
-  }
-}
-
-EventBus.on("matchEnd",()=>{
-  MatchState.state="ended";
-});
-
-/* =========================================================
-   DAMAGE VALIDATION
-========================================================= */
-
-function validateDamage(dmg){
-  const maxAllowed = 200;
-  if(dmg>maxAllowed) return maxAllowed;
-  return dmg;
-}
-
-/* =========================================================
-   SECURE BULLET DAMAGE
-========================================================= */
-
-function secureBulletHit(targetId){
-  const dmg = validateDamage(25);
-
-  const targetRef = ref(
-    db,
-    "rooms/"+Network.room+"/players/"+targetId+"/hp"
-  );
-
-  set(targetRef, dmg);
-}
-/* =========================================================
-   GRID-BASED MAP FOR PATHFINDING
-========================================================= */
-
-const PathGrid = {
-  size: 60,
-  cell: 80,
-  grid: [],
-
-  generate(){
-    this.grid = [];
-    for(let y=0;y<this.size;y++){
-      const row=[];
-      for(let x=0;x<this.size;x++){
-        row.push(Math.random() > 0.2 ? 0 : 1); // 1 = obstacle
-      }
-      this.grid.push(row);
-    }
-  },
-
-  isWalkable(x,y){
-    if(x<0||y<0||x>=this.size||y>=this.size) return false;
-    return this.grid[y][x]===0;
-  }
-};
-
-PathGrid.generate();
-
-/* =========================================================
-   REAL A* PATHFINDING
-========================================================= */
-
-function astar(start,end){
-  const open=[];
-  const closed=new Set();
-
-  open.push({...start,g:0,f:0,parent:null});
-
-  while(open.length){
-    open.sort((a,b)=>a.f-b.f);
-    const current=open.shift();
-    const key=current.x+","+current.y;
-
-    if(current.x===end.x && current.y===end.y){
-      const path=[];
-      let node=current;
-      while(node){
-        path.push({x:node.x,y:node.y});
-        node=node.parent;
-      }
-      return path.reverse();
-    }
-
-    closed.add(key);
-
-    const neighbors=[
-      {x:current.x+1,y:current.y},
-      {x:current.x-1,y:current.y},
-      {x:current.x,y:current.y+1},
-      {x:current.x,y:current.y-1}
-    ];
-
-    for(const n of neighbors){
-      const nKey=n.x+","+n.y;
-      if(closed.has(nKey)) continue;
-      if(!PathGrid.isWalkable(n.x,n.y)) continue;
-
-      const g=current.g+1;
-      const h=Math.abs(n.x-end.x)+Math.abs(n.y-end.y);
-      const f=g+h;
-
-      open.push({...n,g,f,parent:current});
-    }
-  }
-
-  return [];
-}
-
-/* =========================================================
-   ADVANCED ENEMY WITH PATHFINDING
-========================================================= */
-
-function advancedEnemyAI(){
-  for(const [id,e] of ECS.components.enemy){
-    if(e.boss) continue;
-
-    const pos=ECS.components.position.get(id);
-    const ppos=ECS.components.position.get(Player.id);
-
-    const start={
-      x:Math.floor(pos.x/PathGrid.cell),
-      y:Math.floor(pos.y/PathGrid.cell)
-    };
-
-    const end={
-      x:Math.floor(ppos.x/PathGrid.cell),
-      y:Math.floor(ppos.y/PathGrid.cell)
-    };
-
-    const path=astar(start,end);
-    if(path.length>1){
-      const next=path[1];
-      pos.x=next.x*PathGrid.cell;
-      pos.y=next.y*PathGrid.cell;
-    }
-  }
-}
-
-setInterval(advancedEnemyAI,500);
-
-/* =========================================================
-   THREAT SYSTEM
-========================================================= */
-
-const ThreatTable = {};
-
-function addThreat(enemyId, amount){
-  if(!ThreatTable[enemyId]) ThreatTable[enemyId]=0;
-  ThreatTable[enemyId]+=amount;
-}
-
-function getHighestThreat(){
-  let max=0;
-  let target=null;
-  for(const id in ThreatTable){
-    if(ThreatTable[id]>max){
-      max=ThreatTable[id];
-      target=id;
-    }
-  }
-  return target;
-}
-
-/* =========================================================
-   BOSS INTELLIGENCE (AGGRO SWITCH)
-========================================================= */
-
-function advancedBossAI(){
-  for(const [id,e] of ECS.components.enemy){
-    if(!e.boss) continue;
-
-    const pos=ECS.components.position.get(id);
-
-    const target=getHighestThreat();
-    if(target){
-      const tpos=ECS.components.position.get(target);
-      if(tpos){
-        pos.x+=(tpos.x-pos.x)*0.02;
-        pos.y+=(tpos.y-pos.y)*0.02;
-      }
-    }
-  }
-}
-
-setInterval(advancedBossAI,200);
-
-/* =========================================================
-   LOOT AFFIX ENGINE
-========================================================= */
-
-function generateAffix(){
-  const affixes=[
-    {name:"of Power", bonus:{damage:10}},
-    {name:"of Speed", bonus:{speed:15}},
-    {name:"of Vitality", bonus:{hp:25}},
-    {name:"of Crit", bonus:{crit:0.1}}
-  ];
-  return affixes[Math.floor(Math.random()*affixes.length)];
-}
-
-function generateAdvancedLoot(){
-  const base=generateLoot();
-  const affix=generateAffix();
-
-  return {
-    name:base.name+" "+affix.name,
-    rarity:base.rarity,
-    power:base.power,
-    bonus:affix.bonus
-  };
-}
-
-/* =========================================================
-   DAMAGE FLOATING TEXT
-========================================================= */
-
-const FloatingText=[];
-
-function spawnFloatingText(x,y,text){
-  FloatingText.push({
-    x,y,
-    text,
-    life:1
-  });
-}
-
-function updateFloatingText(){
-  for(let i=FloatingText.length-1;i>=0;i--){
-    const f=FloatingText[i];
+function updateFloating(){
+  for(let i=Floating.length-1;i>=0;i--){
+    const f=Floating[i];
     f.y-=30*dt;
     f.life-=dt;
-    if(f.life<=0) FloatingText.splice(i,1);
+    if(f.life<=0) Floating.splice(i,1);
   }
 }
 
-function drawFloatingText(){
-  FloatingText.forEach(f=>{
+function drawFloating(){
+  Floating.forEach(f=>{
     ctx.globalAlpha=f.life;
     ctx.fillStyle="#ff0";
     ctx.fillText(f.text,f.x,f.y);
     ctx.globalAlpha=1;
   });
 }
+setInterval(updateFloating,16);
 
-setInterval(updateFloatingText,16);
+/* ======================================================
+   WORLD EVENTS
+====================================================== */
 
-/* =========================================================
-   CAMERA ZOOM SYSTEM
-========================================================= */
-
-let zoom=1;
-
-addEventListener("wheel",e=>{
-  zoom+=e.deltaY*-0.001;
-  zoom=Math.min(Math.max(0.5,zoom),2);
-});
-
-const oldCamera = Systems.camera;
-Systems.camera = function(){
-  ctx.save();
-  ctx.scale(zoom,zoom);
-  oldCamera();
-};
-
-/* =========================================================
-   ADVANCED PARTICLE PHYSICS
-========================================================= */
-
-function physicsParticles(){
-  particles.forEach(p=>{
-    p.vy+=200*dt; // gravity
-    p.vx*=0.98;
-    p.vy*=0.98;
-  });
+function worldEvent(){
+  alert("WORLD EVENT STARTED!");
+  for(let i=0;i<20;i++){
+    spawnEnemy();
+  }
 }
-setInterval(physicsParticles,16);
-/* =========================================================
-   UI FRAMEWORK CORE
-========================================================= */
+setInterval(worldEvent,120000);
 
-const UI = {
-  elements:[],
+/* ======================================================
+   SAVE / LOAD
+====================================================== */
 
-  create(type,options){
-    const el=document.createElement(type);
-    for(const k in options){
-      if(k==="style"){
-        Object.assign(el.style,options.style);
-      }else{
-        el[k]=options[k];
-      }
-    }
-    document.body.appendChild(el);
-    this.elements.push(el);
-    return el;
-  }
-};
-/* =========================================================
-   INVENTORY GRID UI (REAL)
-========================================================= */
-
-const InventoryUI = {
-  grid:[],
-  container:null,
-
-  init(){
-    this.container=UI.create("div",{
-      style:{
-        position:"fixed",
-        bottom:"20px",
-        left:"50%",
-        transform:"translateX(-50%)",
-        display:"grid",
-        gridTemplateColumns:"repeat(5,60px)",
-        gap:"6px",
-        background:"#000",
-        padding:"10px",
-        border:"2px solid #0ff"
-      }
-    });
-
-    for(let i=0;i<20;i++){
-      const slot=UI.create("div",{
-        style:{
-          width:"60px",
-          height:"60px",
-          background:"#111",
-          border:"1px solid #0ff"
-        }
-      });
-
-      slot.dataset.slot=i;
-      slot.draggable=true;
-
-      slot.addEventListener("dragstart",e=>{
-        e.dataTransfer.setData("text",i);
-      });
-
-      slot.addEventListener("dragover",e=>e.preventDefault());
-
-      slot.addEventListener("drop",e=>{
-        e.preventDefault();
-        const from=e.dataTransfer.getData("text");
-        const temp=Inventory.items[from];
-        Inventory.items[from]=Inventory.items[i];
-        Inventory.items[i]=temp;
-        this.render();
-      });
-
-      this.container.appendChild(slot);
-      this.grid.push(slot);
-    }
-
-    this.render();
-  },
-
-  render(){
-    for(let i=0;i<this.grid.length;i++){
-      const item=Inventory.items[i];
-      const slot=this.grid[i];
-      slot.innerHTML=item?item.name:"";
-      slot.style.color=item?
-        (item.rarity==="LEGENDARY"?"gold":
-         item.rarity==="EPIC"?"purple":
-         item.rarity==="RARE"?"cyan":"white")
-        :"#555";
-    }
-  }
-};
-
-InventoryUI.init();
-/* =========================================================
-   COOLDOWN VISUAL UI
-========================================================= */
-
-const CooldownUI = {
-  bars:{},
-
-  create(name){
-    const bar=UI.create("div",{
-      innerText:name,
-      style:{
-        position:"fixed",
-        right:"20px",
-        bottom:Object.keys(this.bars).length*30+20+"px",
-        background:"#222",
-        color:"#0ff",
-        padding:"4px 8px",
-        border:"1px solid #0ff"
-      }
-    });
-
-    this.bars[name]=bar;
-  },
-
-  update(){
-    for(const name in Abilities.list){
-      const a=Abilities.list[name];
-      const remaining=Math.max(0,
-        a.cooldown-(performance.now()/1000-a.last)
-      );
-      this.bars[name].innerText=
-        name+" "+remaining.toFixed(1);
-    }
-  }
-};
-
-for(const k in Abilities.list){
-  CooldownUI.create(k);
-}
-setInterval(()=>CooldownUI.update(),100);
-/* =========================================================
-   PARTY SYSTEM
-========================================================= */
-
-const Party={
-  members:[Player.id],
-
-  invite(id){
-    if(this.members.length>=4) return;
-    this.members.push(id);
-  },
-
-  remove(id){
-    this.members=this.members.filter(m=>m!==id);
-  }
-};
-/* =========================================================
-   ADVANCED ANTI-CHEAT
-========================================================= */
-
-const AntiCheat={
-  lastPositions:[],
-  checkSpeed(){
-    const pos=ECS.components.position.get(Player.id);
-    this.lastPositions.push({x:pos.x,y:pos.y,time:performance.now()});
-
-    if(this.lastPositions.length>5){
-      this.lastPositions.shift();
-      const a=this.lastPositions[0];
-      const b=this.lastPositions[this.lastPositions.length-1];
-      const dist=Math.hypot(b.x-a.x,b.y-a.y);
-      const time=(b.time-a.time)/1000;
-      const speed=dist/time;
-
-      if(speed>600){
-        console.warn("Speed hack detected");
-        ECS.components.velocity.get(Player.id).x=0;
-        ECS.components.velocity.get(Player.id).y=0;
-      }
-    }
-  }
-};
-
-setInterval(()=>AntiCheat.checkSpeed(),500);
-/* =========================================================
-   DATA COMPRESSION LAYER
-========================================================= */
-
-function compressData(data){
-  return btoa(JSON.stringify(data));
-}
-
-function decompressData(str){
-  return JSON.parse(atob(str));
-}
-/* =========================================================
-   SERVER AUTHORITY DAMAGE VALIDATION 2
-========================================================= */
-
-function authoritativeDamage(targetId,dmg){
-  const safeDmg=validateDamage(dmg);
-
-  const targetRef=ref(
-    db,
-    "rooms/"+Network.room+"/players/"+targetId
+function saveGame(){
+  localStorage.setItem("save",
+    JSON.stringify({
+      level:Player.level,
+      inventory:Inventory.items
+    })
   );
-
-  set(targetRef,{
-    hp:safeDmg
-  });
 }
+
+function loadGame(){
+  const data=JSON.parse(localStorage.getItem("save")||"{}");
+  if(data.level) Player.level=data.level;
+  if(data.inventory) Inventory.items=data.inventory;
+  renderInventory();
+}
+loadGame();
+setInterval(saveGame,15000);
 
 </script>
 </body>
