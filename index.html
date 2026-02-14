@@ -1,53 +1,12 @@
 <!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>NEON RISE ONLINE</title>
-
-<style>
-html,body{
-  margin:0;
-  padding:0;
-  overflow:hidden;
-  background:#05060a;
-  font-family:system-ui;
-}
-canvas{
-  display:block;
-  background:radial-gradient(circle at center,#0b1020,#02030a);
-}
-.ui{
-  position:fixed;
-  top:10px;
-  left:10px;
-  color:#0ff;
-}
-button{
-  background:#0ff2;
-  border:1px solid #0ff;
-  color:#fff;
-  padding:6px 10px;
-  cursor:pointer;
-}
-</style>
-</head>
+<html>
 <body>
 
-<canvas id="game"></canvas>
-<div class="ui">
-  <div id="rank"></div>
-  <button id="createRoom">ODA OLUŞTUR</button>
-  <button id="joinRoom">ODAYA GİR</button>
-</div>
-
 <script type="module">
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, get, remove, onDisconnect }
+import { getDatabase, ref, set } 
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-/* 🔥 BURAYI KENDİ FIREBASE CONFIGİNLE DEĞİŞTİR */
 const firebaseConfig = {
   apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
   authDomain: "pixelroom-ae218.firebaseapp.com",
@@ -55,194 +14,18 @@ const firebaseConfig = {
   projectId: "pixelroom-ae218",
   storageBucket: "pixelroom-ae218.firebasestorage.app",
   messagingSenderId: "720297722320",
-  appId: "1:720297722320:web:c815edae99d1efa7ff39d5",
-  measurementId: "G-HD8901B19M"
+  appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/* ================= CORE ================= */
+set(ref(db, "test"), {
+  working: true
+});
 
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-
-function resize(){
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
-}
-resize();
-addEventListener("resize",resize);
-
-let last=0;
-function loop(t){
-  const dt=(t-last)/1000;
-  last=t;
-  if(state==="play"){
-    update(dt);
-    draw();
-  }
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-
-/* ================= STATE ================= */
-
-let state="menu";
-
-/* ================= INPUT ================= */
-
-const keys={};
-addEventListener("keydown",e=>keys[e.key]=true);
-addEventListener("keyup",e=>keys[e.key]=false);
-
-/* ================= PLAYER ================= */
-
-class Player{
-  constructor(){
-    this.x=0;
-    this.y=0;
-    this.size=18;
-    this.speed=260;
-    this.hp=100;
-    this.level=1;
-  }
-
-  update(dt){
-    let dx=0,dy=0;
-    if(keys["w"]||keys["ArrowUp"]) dy--;
-    if(keys["s"]||keys["ArrowDown"]) dy++;
-    if(keys["a"]||keys["ArrowLeft"]) dx--;
-    if(keys["d"]||keys["ArrowRight"]) dx++;
-
-    const l=Math.hypot(dx,dy);
-    if(l){
-      dx/=l; dy/=l;
-      this.x+=dx*this.speed*dt;
-      this.y+=dy*this.speed*dt;
-    }
-  }
-
-  draw(){
-    ctx.save();
-    ctx.translate(canvas.width/2,canvas.height/2);
-    ctx.shadowBlur=25;
-    ctx.shadowColor="#00ffff";
-    ctx.fillStyle="#00ffff";
-    ctx.beginPath();
-    ctx.arc(0,0,this.size,0,Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
-
-const player=new Player();
-
-/* ================= ENEMY ================= */
-
-class Enemy{
-  constructor(x,y){
-    this.x=x;
-    this.y=y;
-    this.size=16;
-    this.speed=120;
-  }
-
-  update(dt){
-    const dx=player.x-this.x;
-    const dy=player.y-this.y;
-    const d=Math.hypot(dx,dy);
-    this.x+=(dx/d)*this.speed*dt;
-    this.y+=(dy/d)*this.speed*dt;
-  }
-
-  draw(){
-    ctx.beginPath();
-    ctx.fillStyle="#ff3355";
-    ctx.arc(
-      this.x-player.x+canvas.width/2,
-      this.y-player.y+canvas.height/2,
-      this.size,0,Math.PI*2);
-    ctx.fill();
-  }
-}
-
-const enemies=[];
-
-function spawnEnemy(){
-  const a=Math.random()*Math.PI*2;
-  enemies.push(new Enemy(
-    player.x+Math.cos(a)*500,
-    player.y+Math.sin(a)*500
-  ));
-}
-
-setInterval(()=>{
-  if(state==="play") spawnEnemy();
-},2000);
-
-/* ================= UPDATE ================= */
-
-function update(dt){
-  player.update(dt);
-  enemies.forEach(e=>e.update(dt));
-}
-
-/* ================= DRAW ================= */
-
-function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  ctx.strokeStyle="rgba(0,255,255,0.05)";
-  for(let x=-2000;x<2000;x+=60){
-    ctx.beginPath();
-    ctx.moveTo(x-player.x+canvas.width/2,-2000-player.y+canvas.height/2);
-    ctx.lineTo(x-player.x+canvas.width/2,2000-player.y+canvas.height/2);
-    ctx.stroke();
-  }
-
-  enemies.forEach(e=>e.draw());
-  player.draw();
-}
-
-/* ================= MULTIPLAYER ================= */
-
-let room=null;
-let myId="p_"+Math.random().toString(36).substr(2,9);
-let myRef=null;
-
-async function createRoom(){
-  room="room_"+Math.random().toString(36).substr(2,5);
-  joinRoom(room);
-}
-
-async function joinRoom(name){
-  if(myRef) remove(myRef);
-  room=name;
-  myRef=ref(db,"rooms/"+room+"/players/"+myId);
-
-  await set(myRef,{x:player.x,y:player.y});
-  onDisconnect(myRef).remove();
-
-  setInterval(()=>{
-    if(!room) return;
-    set(myRef,{x:player.x,y:player.y});
-  },100);
-
-  state="play";
-}
-
-document.getElementById("createRoom").onclick=createRoom;
-document.getElementById("joinRoom").onclick=async()=>{
-  const snap=await get(ref(db,"rooms"));
-  const rooms=snap.val()||{};
-  for(const r in rooms){
-    joinRoom(r);
-    return;
-  }
-  alert("Oda yok.");
-};
-
+console.log("Firebase çalışıyor");
 </script>
+
 </body>
 </html>
