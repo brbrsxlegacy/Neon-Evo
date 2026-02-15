@@ -1575,14 +1575,27 @@ function dropSkin(){
   player.inventory.push(skin);
 }
 /* =========================
-   WARDROBE (TOGGLE + CLOSE)
+   WARDROBE (FIXED VERSION)
 ========================= */
+
+player.inventory = player.inventory || [];
+player.equippedSkin = player.equippedSkin || null;
 
 let wardrobePanel = null;
 
+// BUTONU ÖNCE OLUŞTUR
+const wardrobeBtn = document.createElement("button");
+wardrobeBtn.textContent = "DOLAP";
+wardrobeBtn.style.position = "fixed";
+wardrobeBtn.style.left = "12px";
+wardrobeBtn.style.top = "120px";
+wardrobeBtn.style.zIndex = "9999";
+document.body.appendChild(wardrobeBtn);
+
+// TOGGLE FONKSİYON
 function toggleWardrobe(){
 
-  // Eğer açık ise kapat
+  // Açıksa kapat
   if (wardrobePanel){
     wardrobePanel.remove();
     wardrobePanel = null;
@@ -1610,15 +1623,23 @@ function toggleWardrobe(){
     <hr>
   `;
 
-  // Skinleri listele
+  // Skin listele
+  if (player.inventory.length === 0){
+    wardrobePanel.innerHTML += "<div>Envanter boş</div>";
+  }
+
   player.inventory.forEach(s=>{
     const b = document.createElement("button");
-    b.textContent = s;
+    b.textContent = s + (player.equippedSkin === s ? " (TAKILI)" : "");
     b.style.display="block";
     b.style.marginBottom="6px";
+
     b.onclick = ()=> {
       player.equippedSkin = s;
+      toggleWardrobe();   // kapanıp tekrar açarak refresh
+      toggleWardrobe();
     };
+
     wardrobePanel.appendChild(b);
   });
 
@@ -1631,19 +1652,8 @@ function toggleWardrobe(){
   };
 }
 
-// Buton override
+// TIKLAMA BAĞLA
 wardrobeBtn.onclick = toggleWardrobe;
-
-
-
-const wardrobeBtn = document.createElement("button");
-wardrobeBtn.textContent = "DOLAP";
-wardrobeBtn.style.position="fixed";
-wardrobeBtn.style.left="12px";
-wardrobeBtn.style.top="120px";
-document.body.appendChild(wardrobeBtn);
-
-wardrobeBtn.onclick = openWardrobe;
 
 /* =========================
    MAIN MENU ROOM SYSTEM + RESPAWN
