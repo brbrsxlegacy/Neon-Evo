@@ -1375,60 +1375,6 @@ renderSettings = function(){
   }
 };
 /* =========================
-   ONLINE LEADERBOARD (FIREBASE)
-========================= */
-
-
-  // İsim sor
-  let playerName = localStorage.getItem("playerName");
-  if (!playerName) {
-    playerName = prompt("İsmini gir:");
-    localStorage.setItem("playerName", playerName);
-  }
-
-  function submitScore() {
-    database.ref("leaderboard/" + playerName).set({
-      level: player.level,
-      coins: player.coins,
-      time: Date.now()
-    });
-  }
-
-  // 30 saniyede bir score gönder
-  setInterval(submitScore, 30000);
-
-  // Leaderboard UI
-  const lbPanel = document.createElement("div");
-  lbPanel.style.cssText = `
-    position:fixed;
-    left:12px;
-    top:80px;
-    background:#000;
-    color:#0ff;
-    border:1px solid #0ff;
-    padding:8px;
-    max-height:300px;
-    overflow:auto;
-    font-size:12px;
-  `;
-  document.body.appendChild(lbPanel);
-
-  database.ref("leaderboard").on("value", snapshot => {
-    const data = snapshot.val();
-    if (!data) return;
-
-    const arr = Object.entries(data)
-      .sort((a,b) => b[1].level - a[1].level)
-      .slice(0,10);
-
-    lbPanel.innerHTML = "<b>🏆 LEADERBOARD</b><hr>";
-    arr.forEach((p,i) => {
-      lbPanel.innerHTML += `
-        ${i+1}. ${p[0]} - Lv ${p[1].level}<br>
-      `;
-    });
-  });
-/* =========================
    FIREBASE ONLINE LEADERBOARD (MODERN v10)
 ========================= */
 
