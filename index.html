@@ -1355,7 +1355,12 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(d
     appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
   };
 
-  const app = initializeApp(firebaseConfig);
+   let app;
+  try {
+    app = initializeApp(firebaseConfig);
+  } catch(e) {
+    app = getApp();
+  }  
   const database = getDatabase(app);
 
   let playerName = localStorage.getItem("playerName");
@@ -1406,112 +1411,6 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(d
 });
 });
 
-/* =========================
-   ONLINE WORLD (ROOM SYSTEM - MAX 10)
-========================= */
-
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js").then(appModule=>{
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
-
-const { initializeApp } = appModule;
-const { getDatabase, ref, set, onValue, remove, onDisconnect, get, child } = dbModule;
-
-const firebaseConfig = {
-  apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
-  authDomain: "pixelroom-ae218.firebaseapp.com",
-  databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "pixelroom-ae218",
-  storageBucket: "pixelroom-ae218.firebasestorage.app",
-  messagingSenderId: "720297722320",
-  appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
-};
-
-let app;
-try {
-  app = initializeApp(firebaseConfig);
-} catch(e) {
-  app = getApp();
-}
-const db = getDatabase(app);
-
-const ROOM = "world1";
-window.playerId = "p_" + Math.random().toString(36).substr(2,9);
-
-const playersRef = ref(db, "rooms/"+ROOM+"/players");
-
-// ---- MAX 10 KONTROL ----
-get(playersRef).then(snapshot=>{
-  const data = snapshot.val();
-  const count = data ? Object.keys(data).length : 0;
-  if (count >= 10){
-    alert("Oda dolu (10/10)");
-    return;
-  }
-
-  // Oyuncuyu ekle
-  const myRef = ref(db, "rooms/"+ROOM+"/players/"+playerId);
-
-  set(myRef, {
-    x: player.x,
-    y: player.y,
-    level: player.level,
-    hp: player.health
-  });
-
-  onDisconnect(myRef).remove();
-
-  // Pozisyon güncelle
-  setInterval(()=>{
-    set(myRef, {
-      x: player.x,
-      y: player.y,
-      level: player.level,
-      hp: player.health
-    });
-  }, 100);
-
-});
-
-// ---- DİĞER OYUNCULARI AL ----
-const remotePlayers = {};
-
-onValue(playersRef, snapshot=>{
-  const data = snapshot.val();
-  if (!data) return;
-
-  Object.keys(data).forEach(id=>{
-    if (id === playerId) return;
-    remotePlayers[id] = data[id];
-  });
-
-  // Silinenleri temizle
-  Object.keys(remotePlayers).forEach(id=>{
-    if (!data[id]) delete remotePlayers[id];
-  });
-});
-
-// ---- DRAW REMOTE PLAYERS ----
-const _drawOnline = draw;
-draw = function(){
-  _drawOnline();
-
-  ctx.save();
-  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
-
-  Object.values(remotePlayers).forEach(p=>{
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = "#ff00ff";
-    ctx.fillStyle = "#ff00ff";
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 16, 0, Math.PI*2);
-    ctx.fill();
-  });
-
-  ctx.restore();
-};
-
-});
-});
 /* =========================
    PVP SYSTEM (SECURE TRANSACTION)
 ========================= */
@@ -1634,135 +1533,7 @@ wardrobeBtn.style.top="120px";
 document.body.appendChild(wardrobeBtn);
 
 wardrobeBtn.onclick = openWardrobe;
-/* =========================
-   ROOM SYSTEM (SELECTABLE ROOMS)
-========================= */
 
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
-
-const { getDatabase, ref, set, onValue, remove, onDisconnect, get } = dbModule;
-const db = getDatabase();
-
-let currentRoom = null;
-let myPlayerRef = null;
-
-// ---- ROOM UI ----
-const roomPanel = document.createElement("div");
-roomPanel.style.cssText = `
-  position:fixed;
-  inset:30%;
-  background:#000;
-  color:#0ff;
-  border:2px solid #0ff;
-  padding:20px;
-  z-index:99999;
-`;
-roomPanel.innerHTML = `
-  <h2>ODA SEÇ</h2>
-  <div id="roomList"></div>
-  <button onclick="closeRoomPanel()">KAPAT</button>
-`;
-document.body.appendChild(roomPanel);
-
-function closeRoomPanel(){
-  roomPanel.style.display="none";
-}
-
-// Room butonu
-const roomBtn = document.createElement("button");
-roomBtn.textContent = "ROOM";
-roomBtn.style.cssText = `
-  position:fixed;
-  top:90px;
-  right:12px;
-`;
-document.body.appendChild(roomBtn);
-
-roomBtn.onclick = ()=>{
-  roomPanel.style.display="block";
-  loadRooms();
-};
-
-// ---- ROOM LİSTESİ ----
-function loadRooms(){
-  const list = document.getElementById("roomList");
-  list.innerHTML = "Yükleniyor...";
-
-  get(ref(db, "rooms")).then(snapshot=>{
-    const data = snapshot.val() || {};
-    list.innerHTML = "";
-
-    for (let i=1;i<=5;i++){
-      const roomName = "world"+i;
-      const count = data[roomName]?.players ? 
-        Object.keys(data[roomName].players).length : 0;
-
-      const btn = document.createElement("button");
-      btn.textContent = `${roomName} (${count}/10)`;
-      btn.style.display="block";
-
-      btn.onclick = ()=>{
-        if (count >= 10){
-          alert("Oda dolu!");
-          return;
-        }
-        joinRoom(roomName);
-        closeRoomPanel();
-      };
-
-      list.appendChild(btn);
-    }
-  });
-}
-
-// ---- ROOM'A KATIL ----
-function joinRoom(roomName){
-
-  // eski odadan çık
-  if (myPlayerRef){
-    remove(myPlayerRef);
-  }
-
-  currentRoom = roomName;
-  const playerId = localStorage.getItem("playerName") || 
-                   "p_"+Math.random().toString(36).substr(2,9);
-
-  myPlayerRef = ref(db, `rooms/${roomName}/players/${playerId}`);
-
-  set(myPlayerRef, {
-    x: player.x,
-    y: player.y,
-    level: player.level,
-    hp: player.health
-  });
-
-  onDisconnect(myPlayerRef).remove();
-
-  // pozisyon güncelle
-  setInterval(()=>{
-    if (!currentRoom) return;
-    set(myPlayerRef, {
-      x: player.x,
-      y: player.y,
-      level: player.level,
-      hp: player.health
-    });
-  }, 120);
-
-  // diğer oyuncuları dinle
-  onValue(ref(db, `rooms/${roomName}/players`), snapshot=>{
-    const data = snapshot.val() || {};
-    Object.keys(remotePlayers).forEach(id=>delete remotePlayers[id]);
-
-    Object.entries(data).forEach(([id, p])=>{
-      if (id === playerId) return;
-      remotePlayers[id] = p;
-    });
-  });
-
-}
-
-});
 /* =========================
    MAIN MENU ROOM SYSTEM + RESPAWN
 ========================= */
