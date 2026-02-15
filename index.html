@@ -1338,6 +1338,66 @@ renderSettings = function(){
 /* =========================
    FIREBASE ONLINE LEADERBOARD (MODERN v10)
 ========================= */
+/* =========================
+   ROBLOX STYLE LEADERBOARD
+========================= */
+
+const leaderboardWrapper = document.createElement("div");
+leaderboardWrapper.style.cssText = `
+  position:fixed;
+  right:10px;
+  bottom:10px;
+  width:260px;
+  max-height:320px;
+  background:#000;
+  border:1px solid #0ff;
+  color:#0ff;
+  font-size:12px;
+  display:flex;
+  flex-direction:column;
+  transition:transform 0.35s ease;
+  box-shadow:0 0 15px #0ff;
+  z-index:9999;
+`;
+
+document.body.appendChild(leaderboardWrapper);
+
+// HEADER
+const lbHeader = document.createElement("div");
+lbHeader.style.cssText = `
+  padding:6px;
+  background:#001f1f;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  cursor:pointer;
+`;
+lbHeader.innerHTML = `<b>🏆 LEADERBOARD</b><span id="lbToggle">⬆</span>`;
+leaderboardWrapper.appendChild(lbHeader);
+
+// CONTENT (SCROLLABLE)
+const lbContent = document.createElement("div");
+lbContent.style.cssText = `
+  overflow-y:auto;
+  flex:1;
+  padding:6px;
+`;
+leaderboardWrapper.appendChild(lbContent);
+
+// Toggle logic
+let lbClosed = false;
+
+lbHeader.onclick = () => {
+  lbClosed = !lbClosed;
+
+  if (lbClosed) {
+    leaderboardWrapper.style.transform = "translateY(280px)";
+    document.getElementById("lbToggle").textContent = "⬇";
+  } else {
+    leaderboardWrapper.style.transform = "translateY(0px)";
+    document.getElementById("lbToggle").textContent = "⬆";
+  }
+};
 
 import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js").then(appModule => {
 import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
@@ -1379,37 +1439,38 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(d
 
   setInterval(submitScore, 30000);
 
-  const lbPanel = document.createElement("div");
-  lbPanel.style.cssText = `
-    position:fixed;
-    left:12px;
-    top:80px;
-    background:#000;
-    color:#0ff;
-    border:1px solid #0ff;
-    padding:8px;
-    max-height:300px;
-    overflow:auto;
-    font-size:12px;
-  `;
-  document.body.appendChild(lbPanel);
 
-  onValue(ref(database, "leaderboard"), snapshot => {
-    const data = snapshot.val();
-    if (!data) return;
+onValue(ref(database, "leaderboard"), snapshot => {
 
-    const arr = Object.entries(data)
-      .sort((a,b) => b[1].level - a[1].level)
-      .slice(0,10);
+  const data = snapshot.val();
+  if (!data) return;
 
-    lbPanel.innerHTML = "<b>🏆 ONLINE LEADERBOARD</b><hr>";
-    arr.forEach((p,i) => {
-      lbPanel.innerHTML += `${i+1}. ${p[0]} - Lv ${p[1].level}<br>`;
-    });
+  const arr = Object.entries(data)
+    .sort((a,b) => b[1].level - a[1].level);
+
+  lbContent.innerHTML = "";
+
+  arr.forEach((p,i) => {
+
+    let color = "#0ff";
+
+    if (i === 0) color = "#ffd700";
+    else if (i === 1) color = "#c0c0c0";
+    else if (i === 2) color = "#cd7f32";
+
+    lbContent.innerHTML += `
+      <div style="
+        padding:4px;
+        border-bottom:1px solid #022;
+        color:${color};
+      ">
+        ${i+1}. ${p[0]} - Lv ${p[1].level}
+      </div>
+    `;
   });
 
 });
-});
+
 
 /* =========================
    PVP SYSTEM (SECURE TRANSACTION)
