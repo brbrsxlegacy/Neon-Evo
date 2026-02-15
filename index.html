@@ -1574,26 +1574,67 @@ function dropSkin(){
   const skin = "skin_" + Math.floor(Math.random()*1000);
   player.inventory.push(skin);
 }
+/* =========================
+   WARDROBE (TOGGLE + CLOSE)
+========================= */
 
-function openWardrobe(){
-  const w = document.createElement("div");
-  w.style.cssText = `
-    position:fixed; inset:20%;
-    background:#000; color:#0ff;
+let wardrobePanel = null;
+
+function toggleWardrobe(){
+
+  // Eğer açık ise kapat
+  if (wardrobePanel){
+    wardrobePanel.remove();
+    wardrobePanel = null;
+    return;
+  }
+
+  // Panel oluştur
+  wardrobePanel = document.createElement("div");
+  wardrobePanel.style.cssText = `
+    position:fixed;
+    inset:20%;
+    background:#000;
+    color:#0ff;
     border:2px solid #0ff;
+    padding:20px;
     overflow:auto;
+    z-index:9999;
   `;
-  w.innerHTML = "<h3>DOLAP</h3>";
 
+  wardrobePanel.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3>DOLAP</h3>
+      <button id="closeWardrobe">✕</button>
+    </div>
+    <hr>
+  `;
+
+  // Skinleri listele
   player.inventory.forEach(s=>{
     const b = document.createElement("button");
     b.textContent = s;
-    b.onclick = ()=> player.equippedSkin = s;
-    w.appendChild(b);
+    b.style.display="block";
+    b.style.marginBottom="6px";
+    b.onclick = ()=> {
+      player.equippedSkin = s;
+    };
+    wardrobePanel.appendChild(b);
   });
 
-  document.body.appendChild(w);
+  document.body.appendChild(wardrobePanel);
+
+  // X butonu
+  document.getElementById("closeWardrobe").onclick = ()=>{
+    wardrobePanel.remove();
+    wardrobePanel = null;
+  };
 }
+
+// Buton override
+wardrobeBtn.onclick = toggleWardrobe;
+
+
 
 const wardrobeBtn = document.createElement("button");
 wardrobeBtn.textContent = "DOLAP";
