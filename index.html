@@ -189,8 +189,10 @@ const enemies = [];
 // Enemy türleri
 const ENEMY_TYPES = {
   MELEE: "melee",
-  RANGED: "ranged"
+  RANGED: "ranged",
+  BOSS: "boss"
 };
+
 
 // Enemy oluşturucu
 function spawnEnemy(type = ENEMY_TYPES.MELEE) {
@@ -396,7 +398,10 @@ update = function(dt) {
 
       if (e.health <= 0) {
         // XP kazan
-        player.xp += e.type === ENEMY_TYPES.MELEE ? 20 : 15;
+       player.xp += 
+        e.type === ENEMY_TYPES.MELEE ? 20 :
+        e.type === ENEMY_TYPES.RANGED ? 15 :
+        120; // boss xp  
         enemies.splice(i, 1);
 
         // küçük sarsıntı
@@ -918,7 +923,7 @@ const ADMIN_CODE = "sus304";
 player.isAdmin = false;
 
 // Coini uçur 😈
-player.coins = 10000000000;
+if (player.isAdmin) player.coins = 10000000000;
 
 /* ---- SHOP ITEMS (50 ADET) ---- */
 const SHOP_ITEMS_ADV = [];
@@ -1373,29 +1378,6 @@ renderSettings = function(){
    ONLINE LEADERBOARD (FIREBASE)
 ========================= */
 
-// Firebase SDK ekle
-const fbScript1 = document.createElement("script");
-fbScript1.src = "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-document.head.appendChild(fbScript1);
-
-const fbScript2 = document.createElement("script");
-fbScript2.src = "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-document.head.appendChild(fbScript2);
-
-setTimeout(() => {
-
-  const firebaseConfig = {
-    apiKey: "BURAYA_API_KEY",
-    authDomain: "BURAYA_AUTH_DOMAIN",
-    databaseURL: "BURAYA_DATABASE_URL",
-    projectId: "BURAYA_PROJECT_ID",
-    storageBucket: "BURAYA_STORAGE",
-    messagingSenderId: "BURAYA_ID",
-    appId: "BURAYA_APP_ID"
-  };
-
-  const app = firebase.initializeApp(firebaseConfig);
-  const database = firebase.database();
 
   // İsim sor
   let playerName = localStorage.getItem("playerName");
@@ -1543,7 +1525,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 const ROOM = "world1";
-const playerId = "p_" + Math.random().toString(36).substr(2,9);
+window.playerId = "p_" + Math.random().toString(36).substr(2,9);
 
 const playersRef = ref(db, "rooms/"+ROOM+"/players");
 
@@ -1629,6 +1611,7 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(d
 const { getDatabase, ref, runTransaction } = dbModule;
 
 const db = getDatabase();
+if (!window.playerId) return;
 const ROOM = "world1";
 
 // PvP kontrol (melee alanında)
@@ -1727,7 +1710,7 @@ update = function(dt){
 
 function spawnMiniBoss(){
   enemies.push({
-    type: "boss",
+   type: ENEMY_TYPES.BOSS,
     x: player.x + 300,
     y: player.y,
     size: 40,
@@ -2117,7 +2100,7 @@ chatBox.appendChild(chatInput);
 chatInput.addEventListener("keydown", e=>{
   if (e.key === "Enter" && currentRoom){
     push(ref(db, `rooms/${currentRoom}/chat`), {
-      user: myPlayerId,
+     user: window.playerId || myPlayerId,
       msg: chatInput.value,
       time: Date.now()
     });
@@ -2162,12 +2145,13 @@ update = function(dt){
 };
 
 // Respawn sırasında kalkan ver
-const _respawnFix = joinRoom;
-joinRoom = function(roomName){
-  _respawnFix(roomName);
-  player.spawnShield = 3;
-};
-
+if (typeof joinRoom === "function"){
+  const _respawnFix = joinRoom;
+  joinRoom = function(roomName){
+    _respawnFix(roomName);
+    player.spawnShield = 3;
+  };
+}
 // PvP kontrolüne ekle
 const _checkPvPShield = checkPvP;
 checkPvP = function(){
@@ -2314,4 +2298,4 @@ draw = function(){
 
 </script>
 </body>
-</html>F
+</html>
