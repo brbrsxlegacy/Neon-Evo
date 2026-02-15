@@ -816,42 +816,6 @@ function getEvolutionByLevel(lv){
   };
 }
 
-/* ---- OVERRIDE DRAW (PLAYER TEK NOKTA) ---- */
-  ctx.save();
-  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
-  
-  const evo = getEvolutionByLevel(player.level);
-
-  // Aura
-  ctx.globalAlpha = 0.15;
-  ctx.strokeStyle = evo.color;
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, player.auraRadius, 0, Math.PI*2);
-  ctx.stroke();
-
-  // Player
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = evo.glow;
-  ctx.shadowColor = evo.color;
-  ctx.fillStyle = evo.color;
-
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, evo.size, 0, Math.PI*2);
-  ctx.fill();
-
-  // Outfit (basit görsel temsil)
-  if (player.appearance.outfit !== "none"){
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(player.x, player.y+4, evo.size-4, 0, Math.PI);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-  
-});
-});
 /* ---- MARKET DATA ---- */
 player.coins = 0;
 const SHOP_ITEMS = [
