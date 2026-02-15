@@ -1403,10 +1403,13 @@ lbHeader.onclick = () => {
     document.getElementById("lbToggle").textContent = "⬆";
   }
 };
-
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js").then(appModule => {
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
   
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js")
+.then(appModule => {
+
+import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
+.then(dbModule => {
+
   const { initializeApp, getApp } = appModule;
   const { getDatabase, ref, set, onValue } = dbModule;
 
@@ -1418,15 +1421,15 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(d
     storageBucket: "pixelroom-ae218.firebasestorage.app",
     messagingSenderId: "720297722320",
     appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
-  );
+  };
 
-
-   let app;
+  let app;
   try {
     app = initializeApp(firebaseConfig);
   } catch(e) {
     app = getApp();
-  }  
+  }
+
   const database = getDatabase(app);
 
   let playerName = localStorage.getItem("playerName");
@@ -1445,36 +1448,39 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(d
 
   setInterval(submitScore, 30000);
 
+  onValue(ref(database, "leaderboard"), snapshot => {
 
-onValue(ref(database, "leaderboard"), snapshot => {
+    const data = snapshot.val();
+    if (!data) return;
 
-  const data = snapshot.val();
-  if (!data) return;
+    const arr = Object.entries(data)
+      .sort((a,b) => b[1].level - a[1].level);
 
-  const arr = Object.entries(data)
-    .sort((a,b) => b[1].level - a[1].level);
+    lbContent.innerHTML = "";
 
-  lbContent.innerHTML = "";
+    arr.forEach((p,i) => {
 
-  arr.forEach((p,i) => {
+      let color = "#0ff";
+      if (i === 0) color = "#ffd700";
+      else if (i === 1) color = "#c0c0c0";
+      else if (i === 2) color = "#cd7f32";
 
-    let color = "#0ff";
+      lbContent.innerHTML += `
+        <div style="
+          padding:4px;
+          border-bottom:1px solid #022;
+          color:${color};
+        ">
+          ${i+1}. ${p[0]} - Lv ${p[1].level}
+        </div>
+      `;
+    });
 
-    if (i === 0) color = "#ffd700";
-    else if (i === 1) color = "#c0c0c0";
-    else if (i === 2) color = "#cd7f32";
+  });
 
-    lbContent.innerHTML += `
-      <div style="
-        padding:4px;
-        border-bottom:1px solid #022;
-        color:${color};
-      ">
-        ${i+1}. ${p[0]} - Lv ${p[1].level}
-      </div>
-    `;
 });
 });
+
 /* =========================
    PVP SYSTEM (SECURE TRANSACTION)
 ========================= */
