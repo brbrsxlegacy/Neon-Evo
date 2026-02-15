@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>NEON RISE</title>
+<link rel="icon" href="data:,">
 
 <style>
 html, body {
@@ -129,8 +130,10 @@ const player = {
   x: WORLD_SPAWN.x,
   y: WORLD_SPAWN.y,
   size: 18,
-  speed: 260
+  speed: 260,
+  slowTimer: 0
 };
+
 
 function update(dt) {
   let dx = 0, dy = 0;
@@ -168,6 +171,13 @@ function getBiome(x,y){
   if(x < -900) return "ice";
   return "forest";
 }
+  
+  if(player.slowTimer > 0){
+    player.slowTimer -= dt;
+    player.speed = 140;
+  }else{
+    player.speed = 260;
+  }
 
 /* =========================
    DRAW
@@ -177,7 +187,7 @@ function draw() {
 
   ctx.save();
   ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
-
+  const biome = getBiome(player.x, player.y);
   // WORLD BACKGROUND (biyoma göre renk)
   let bg;
   
@@ -206,6 +216,10 @@ function draw() {
                   "#00ffaa33";
   ctx.lineWidth = 1;
 
+
+  const biome = getBiome(player.x, player.y);
+
+  
   // Grid
   const gridSize = 60;
   const startX = Math.floor((player.x - canvas.width/2) / gridSize) * gridSize;
@@ -288,7 +302,7 @@ update = function(dt) {
 
   enemySpawnTimer -= dt;
   if (enemySpawnTimer <= 0) {
-    spawnEnemy(Math.random() < 0.5 ? ENEMY_TYPES.MELEE : ENEMY_TYPES.RANGED);
+    spawnEnemy();
     enemySpawnTimer = 1.5;
   }
 
@@ -296,6 +310,24 @@ update = function(dt) {
     const dx = player.x - e.x;
     const dy = player.y - e.y;
     const dist = Math.hypot(dx, dy) || 1;
+    // FIRE ENEMY
+    if(e.type === ENEMY_TYPES.FIRE){
+      e.cooldown -= dt;
+      if(e.cooldown <= 0){
+        spawnParticles(e.x, e.y, "#ff5500", 6);
+        player.health -= 3;
+        e.cooldown = 2;
+      }
+    }
+    
+    // ICE ENEMY
+    if(e.type === ENEMY_TYPES.ICE){
+      const d = Math.hypot(player.x-e.x, player.y-e.y);
+      if(d < 120){
+        player.slowTimer = 0.5;
+        spawnParticles(player.x, player.y, "#66ccff", 2);
+      }
+    }
 
     if (e.type === ENEMY_TYPES.MELEE) {
       // Yakın dövüş: direkt takip
@@ -311,28 +343,7 @@ update = function(dt) {
   });
 };
 
-  // FIRE ENEMY
-if(e.type === ENEMY_TYPES.FIRE){
-  e.cooldown -= dt;
-  if(e.cooldown <= 0){
-    spawnParticles(e.x, e.y, "#ff5500", 6);
-    player.health -= 3;
-    e.cooldown = 2;
-  }
-}
 
-  // ICE ENEMY
-if(e.type === ENEMY_TYPES.ICE){
-  const d = Math.hypot(player.x-e.x, player.y-e.y);
-  if(d < 120){
-    player.speed *= 0.96;
-    spawnParticles(player.x, player.y, "#66ccff", 2);
-  }
-}
-
-
-
-  
 // Draw içine ENTEGRE
 const _oldDraw = draw;
 draw = function() {
@@ -387,6 +398,7 @@ update = function(dt) {
       if (player.invuln <= 0) {
         player.health -= e.type === ENEMY_TYPES.MELEE ? 10 : 6;
         player.invuln = 0.6;
+        
 
         // küçük geri itme
         const dx = player.x - e.x;
@@ -406,6 +418,7 @@ update = function(dt) {
     }
   });
 };
+
 
 // Draw'e HUD ekle
 const _draw2 = draw;
