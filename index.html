@@ -817,7 +817,9 @@ function getEvolutionByLevel(lv){
 }
 
 /* ---- OVERRIDE DRAW (PLAYER TEK NOKTA) ---- */
- 
+  ctx.save();
+  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+  
   const evo = getEvolutionByLevel(player.level);
 
   // Aura
@@ -2176,71 +2178,6 @@ draw = function(){
   ctx.fillText(tag + myPlayerId, player.x-20, player.y-25);
 
   ctx.restore();
-};
-/* =========================
-   REAL MAIN MENU SYSTEM
-========================= */
-
-let GAME_ACTIVE = false;
-
-// Menü container
-const mainMenuUI = document.createElement("div");
-mainMenuUI.style.cssText = `
-  position:fixed;
-  inset:0;
-  background:radial-gradient(circle at center,#0b1020,#02030a);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  color:#0ff;
-  z-index:1000000;
-`;
-
-mainMenuUI.innerHTML = `
-  <h1 style="font-size:42px; margin-bottom:30px;">
-    NEON RISE ONLINE
-  </h1>
-
-  <button id="mmPlay">PLAY</button>
-  <button id="mmRooms">ROOMS</button>
-  <button id="mmSettings">SETTINGS</button>
-`;
-
-document.body.appendChild(mainMenuUI);
-
-// Stil ver
-mainMenuUI.querySelectorAll("button").forEach(btn=>{
-  btn.style.cssText = `
-    width:220px;
-    padding:12px;
-    margin:10px;
-    font-size:16px;
-    background:#000;
-    color:#0ff;
-    border:2px solid #0ff;
-    cursor:pointer;
-  `;
-});
-
-// PLAY
-document.getElementById("mmPlay").onclick = ()=>{
-  GAME_ACTIVE = true;
-  mainMenuUI.style.display="none";
-};
-
-// ROOMS
-document.getElementById("mmRooms").onclick = ()=>{
-  if (typeof roomPanel !== "undefined"){
-    roomPanel.style.display="block";
-  }
-};
-
-// SETTINGS
-document.getElementById("mmSettings").onclick = ()=>{
-  if (typeof settingsPanel !== "undefined"){
-    settingsPanel.style.display="block";
-  }
 };
 
 </script>
