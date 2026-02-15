@@ -1380,8 +1380,8 @@ renderSettings = function(){
 
 import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js").then(appModule => {
 import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
-
-  const { initializeApp } = appModule;
+  
+  const { initializeApp, getApp } = appModule;
   const { getDatabase, ref, set, onValue } = dbModule;
 
   const firebaseConfig = {
@@ -1465,7 +1465,12 @@ const firebaseConfig = {
   appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
 };
 
-const app = initializeApp(firebaseConfig);
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+} catch(e) {
+  app = getApp();
+}
 const db = getDatabase(app);
 
 const ROOM = "world1";
