@@ -52,6 +52,15 @@ canvas {
 </div>
 
 <script>
+
+const remotePlayers = {};
+
+let myPlayerId = localStorage.getItem("playerName") || 
+                 "p_" + Math.random().toString(36).substr(2,9);
+
+window.playerId = myPlayerId;
+
+
 /* =========================
    CANVAS & GAME LOOP
 ========================= */
@@ -143,7 +152,7 @@ function update(dt) {
   player.x += dx * player.speed * dt;
   player.y += dy * player.speed * dt;
 }
-
+const remotePlayers = {};
 /* =========================
    DRAW
 ========================= */
@@ -1832,12 +1841,6 @@ if (typeof joinRoom === "function"){
     player.spawnShield = 3;
   };
 }
-// PvP kontrolüne ekle
-const _checkPvPShield = checkPvP;
-checkPvP = function(){
-  if (player.spawnShield > 0) return;
-  _checkPvPShield();
-};
 /* =========================
    BOSS SPAWN CONDITION
 ========================= */
