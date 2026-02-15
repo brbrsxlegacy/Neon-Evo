@@ -152,6 +152,14 @@ function update(dt) {
   player.x += dx * player.speed * dt;
   player.y += dy * player.speed * dt;
 }
+
+player.dash = {
+  cooldown: 0,
+  cdTime: 1.2,
+  power: 160,
+  invulnTime: 0.25
+};
+
 /* =========================
    DRAW
 ========================= */
@@ -533,11 +541,15 @@ function mkBtn(txt){
 }
 const meleeBtn = mkBtn("MELEE");
 const rangedBtn = mkBtn("SHOT");
+const dashBtn = mkBtn("DASH");
+
 
 meleeBtn.addEventListener("touchstart", ()=>attackInput.melee=true);
 meleeBtn.addEventListener("touchend", ()=>attackInput.melee=false);
 rangedBtn.addEventListener("touchstart", ()=>attackInput.ranged=true);
 rangedBtn.addEventListener("touchend", ()=>attackInput.ranged=false);
+dashBtn.addEventListener("touchstart", ()=>attackInput.dash=true);
+dashBtn.addEventListener("touchend", ()=>attackInput.dash=false);
 
 // ---- MELEE ----
 player.melee = {
@@ -571,6 +583,31 @@ function shootBullet(){
     vy: ty * player.ranged.speed,
     r: 4
   });
+}
+
+function performDash(){
+
+  if(player.dash.cooldown > 0) return;
+
+  let dx = joyX;
+  let dy = joyY;
+
+  if(dx === 0 && dy === 0){
+    dx = 1; // yön yoksa ileri
+  }
+
+  const len = Math.hypot(dx,dy) || 1;
+  dx /= len;
+  dy /= len;
+
+  player.x += dx * player.dash.power;
+  player.y += dy * player.dash.power;
+
+  player.invuln = player.dash.invulnTime;
+  player.dash.cooldown = player.dash.cdTime;
+
+  spawnParticles(player.x, player.y, player._evoColor || "#0ff", 12);
+  screenShake.time = 0.15;
 }
 
 // ---- UPDATE ENTEGRASYONU ----
@@ -630,6 +667,15 @@ update = function(dt){
     }
   }
 };
+
+attackInput.dash = false;
+
+window.addEventListener("keydown", e => {
+  if (e.key === "Shift") attackInput.dash = true;
+});
+window.addEventListener("keyup", e => {
+  if (e.key === "Shift") attackInput.dash = false;
+});
 
 // ---- DRAW ENTEGRASYONU ----
 const _draw4 = draw;
@@ -1949,8 +1995,22 @@ document.body.appendChild(rankHUD);
 const _updateRank = update;
 update = function(dt){
   _updateRank(dt);
+
+  // RANK HUD
   rankHUD.textContent = "RANK: " + getRank(player.level);
+
+  // DASH COOLDOWN
+  if(player.dash.cooldown > 0){
+    player.dash.cooldown -= dt;
+  }
+
+  // DASH TETİKLEME
+  if(attackInput.dash){
+    performDash();
+    attackInput.dash = false;
+  }
 };
+
 /* =========================
    CLAN SYSTEM
 ========================= */
