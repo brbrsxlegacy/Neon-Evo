@@ -817,13 +817,7 @@ function getEvolutionByLevel(lv){
 }
 
 /* ---- OVERRIDE DRAW (PLAYER TEK NOKTA) ---- */
-const _drawFinal = draw;
-draw = function(){
-  _drawFinal();
-
-  ctx.save();
-  ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
-
+ 
   const evo = getEvolutionByLevel(player.level);
 
   // Aura
@@ -1611,48 +1605,7 @@ update = function(dt){
 };
 
 });
-/* =========================
-   GAME STATE + MAIN MENU
-========================= */
 
-let gameState = "menu";
-
-const menuScreen = document.createElement("div");
-menuScreen.style.cssText = `
-  position:fixed;
-  inset:0;
-  background:#000;
-  color:#0ff;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  flex-direction:column;
-  z-index:9999;
-`;
-menuScreen.innerHTML = `
-  <h1>NEON RISE ONLINE</h1>
-  <button id="startGame">START</button>
-`;
-document.body.appendChild(menuScreen);
-
-document.getElementById("startGame").onclick = () => {
-  gameState = "play";
-  menuScreen.style.display = "none";
-};
-
-const _updateState = update;
-update = function(dt){
-  if (gameState !== "play") return;
-  _updateState(dt);
-
-  if (player.health <= 0){
-    player.level = 1;
-    player.xp = 0;
-    player.health = player.maxHealth;
-    gameState = "menu";
-    menuScreen.style.display = "flex";
-  }
-};
 /* =========================
    MINI BOSS SYSTEM
 ========================= */
@@ -1862,17 +1815,12 @@ localStorage.setItem("playerName", myPlayerId);
 /* ---------- ANA MENÜ ---------- */
 
 const mainMenu = document.createElement("div");
-mainMenu.style.cssText = `
-  position:fixed;
-  inset:0;
-  background:#000;
-  color:#0ff;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  flex-direction:column;
-  z-index:999999;
+mainMenu.innerHTML = `
+  <h1>NEON RISE ONLINE</h1>
+  <button id="createRoomBtn">ODA OLUŞTUR</button>
+  <button id="joinRoomBtn">ODAYA GİR</button>
 `;
+
 mainMenu.innerHTML = `
   <h1>NEON RISE ONLINE</h1>
   <button id="createRoomBtn">ODA OLUŞTUR</button>
@@ -1992,21 +1940,6 @@ update = function(dt){
 };
 
 });
-/* =========================
-   REMOVE OLD START MENU FIX
-========================= */
-
-// Eski START butonunu gizle
-const oldStartBtn = document.getElementById("startGame");
-if (oldStartBtn) {
-  const oldMenu = oldStartBtn.closest("div");
-  if (oldMenu) oldMenu.style.display = "none";
-}
-
-// Eğer eski gameState varsa bypass et
-if (typeof gameState !== "undefined") {
-  gameState = "play";
-}
 /* =========================
    ROOM CHAT SYSTEM
 ========================= */
@@ -2243,6 +2176,71 @@ draw = function(){
   ctx.fillText(tag + myPlayerId, player.x-20, player.y-25);
 
   ctx.restore();
+};
+/* =========================
+   REAL MAIN MENU SYSTEM
+========================= */
+
+let GAME_ACTIVE = false;
+
+// Menü container
+const mainMenuUI = document.createElement("div");
+mainMenuUI.style.cssText = `
+  position:fixed;
+  inset:0;
+  background:radial-gradient(circle at center,#0b1020,#02030a);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  color:#0ff;
+  z-index:1000000;
+`;
+
+mainMenuUI.innerHTML = `
+  <h1 style="font-size:42px; margin-bottom:30px;">
+    NEON RISE ONLINE
+  </h1>
+
+  <button id="mmPlay">PLAY</button>
+  <button id="mmRooms">ROOMS</button>
+  <button id="mmSettings">SETTINGS</button>
+`;
+
+document.body.appendChild(mainMenuUI);
+
+// Stil ver
+mainMenuUI.querySelectorAll("button").forEach(btn=>{
+  btn.style.cssText = `
+    width:220px;
+    padding:12px;
+    margin:10px;
+    font-size:16px;
+    background:#000;
+    color:#0ff;
+    border:2px solid #0ff;
+    cursor:pointer;
+  `;
+});
+
+// PLAY
+document.getElementById("mmPlay").onclick = ()=>{
+  GAME_ACTIVE = true;
+  mainMenuUI.style.display="none";
+};
+
+// ROOMS
+document.getElementById("mmRooms").onclick = ()=>{
+  if (typeof roomPanel !== "undefined"){
+    roomPanel.style.display="block";
+  }
+};
+
+// SETTINGS
+document.getElementById("mmSettings").onclick = ()=>{
+  if (typeof settingsPanel !== "undefined"){
+    settingsPanel.style.display="block";
+  }
 };
 
 </script>
