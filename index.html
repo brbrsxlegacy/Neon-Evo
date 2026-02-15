@@ -802,6 +802,14 @@ draw = function () {
   ctx.beginPath();
   ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
   ctx.fill();
+  // Equipped skin efekti
+if (player.equippedSkin) {
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#fff";
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = "#fff";
+  ctx.stroke();
+}
 
   ctx.restore();
 };
@@ -1004,12 +1012,19 @@ function renderShopAdvanced() {
       <small>${it.price}</small>
     `;
     card.onclick = () => {
-      if (player.coins >= it.price) {
-        player.coins -= it.price;
-        if (it.type === "aura") player.auraRadius += 4;
-        else player.appearance.outfit = it.id;
-        renderShopAdvanced();
-      }
+     if (player.coins >= it.price) {
+  player.coins -= it.price;
+
+  if (it.type === "aura") {
+    player.auraRadius += 4;
+  } else {
+    // inventory Set olduğu için duplicate olmaz
+    player.inventory.add(it.id);
+  }
+
+  renderShopAdvanced();
+}
+
     };
     shopPanel.appendChild(card);
   });
@@ -1628,7 +1643,7 @@ function toggleWardrobe(){
     wardrobePanel.innerHTML += "<div>Envanter boş</div>";
   }
 
-  player.inventory.forEach(s=>{
+    Array.from(player.inventory).forEach(s=>{
     const b = document.createElement("button");
     b.textContent = s + (player.equippedSkin === s ? " (TAKILI)" : "");
     b.style.display="block";
