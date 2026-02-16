@@ -156,14 +156,6 @@ const remotePlayers = {};
 let myPlayerId = localStorage.getItem("playerName") || 
                  "p_" + Math.random().toString(36).substr(2,9);
 
-window.playerId = myPlayerId;
-
-<div id="shopMenu" style="display:none;">
-  <h2>SHOP</h2>
-  <div id="shopItems"></div>
-  <button onclick="closeShop()">BACK</button>
-</div>
-
 /* =========================
    CANVAS & GAME LOOP
 ========================= */
@@ -269,12 +261,13 @@ player.dash = {
 
 player.quests = [];
 
+
   if(player.slowTimer > 0){
-    player.slowTimer -= dt;
-    player.speed = 140;
-  }else{
-    player.speed = 260;
-  }
+      player.slowTimer -= dt;
+      player.speed = 140;
+    }else{
+      player.speed = 260;
+    }
 
 function getBiome(x,y){
   if(x > 900) return "fire";
@@ -1539,6 +1532,7 @@ function stopMusic(){
 window.addEventListener("pointerdown", startMusic, { once:true });
 
 // ---- AYAR MENÜSÜ ----
+const settingsBtn = document.createElement("button");
 settingsBtn.textContent = "SETTINGS";
 settingsBtn.style.cssText = `
   position:fixed; top:12px; left:12px;
