@@ -108,6 +108,13 @@ canvas {
 </head>
 
 <body>
+
+<div id="shopMenu" style="display:none;">
+  <h2>SHOP</h2>
+  <div id="shopItems"></div>
+  <button onclick="closeShop()">BACK</button>
+</div>
+
 <canvas id="game"></canvas>
 
 <div id="mainMenu">
@@ -273,6 +280,42 @@ function getBiome(x,y){
   if(x > 900) return "fire";
   if(x < -900) return "ice";
   return "forest";
+}
+
+
+
+function startGame(){
+  const mm = document.getElementById("mainMenu");
+  if (mm) mm.style.display = "none";
+  const sm = document.getElementById("shopMenu");
+  if (sm) sm.style.display = "none";
+  gameRunning = true;
+}
+
+function openSettings(){
+  document.getElementById("mainMenu").style.display="none";
+  document.getElementById("settingsMenu").style.display="flex";
+}
+
+function closeSettings(){
+  document.getElementById("settingsMenu").style.display="none";
+  document.getElementById("mainMenu").style.display="flex";
+}
+  
+function openShop(){
+  const mm = document.getElementById("mainMenu");
+  if (mm) mm.style.display = "none";
+  const sm = document.getElementById("shopMenu");
+  if (sm) sm.style.display = "flex";
+  if (typeof renderShopAdvanced === "function") renderShopAdvanced();
+  else if (typeof renderShop === "function") renderShop();
+}
+
+function closeShop(){
+  const sm = document.getElementById("shopMenu");
+  if (sm) sm.style.display = "none";
+  const mm = document.getElementById("mainMenu");
+  if (mm) mm.style.display = "flex";
 }
 
 /* =========================
@@ -460,39 +503,6 @@ draw = function() {
 
   ctx.restore();
 };
-
-  function startGame(){
-  document.getElementById("mainMenu").style.display="none";
-  gameRunning = true;
-}
-
-function openSettings(){
-  document.getElementById("mainMenu").style.display="none";
-  document.getElementById("settingsMenu").style.display="flex";
-}
-
-function closeSettings(){
-  document.getElementById("settingsMenu").style.display="none";
-  document.getElementById("mainMenu").style.display="flex";
-}
-
-window.addEventListener("keydown", e => {
-  if(e.key === "Escape"){
-    gameRunning = false;
-    document.getElementById("mainMenu").style.display="flex";
-  }
-});
-
-function openShop(){
-  document.getElementById("mainMenu").style.display="none";
-  document.getElementById("shopMenu").style.display="flex";
-  renderShopAdvanced();
-}
-
-function closeShop(){
-  document.getElementById("shopMenu").style.display="none";
-  document.getElementById("mainMenu").style.display="flex";
-}
 
 /* =========================
    HEALTH & COLLISION SYSTEM
