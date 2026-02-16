@@ -1,8 +1,9 @@
+/* =========================
+   DOM READY
+========================= */
 window.addEventListener("DOMContentLoaded", () => {
 
-/* =========================
-   CANVAS SETUP
-========================= */
+//// CANVAS
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
@@ -13,18 +14,13 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-/* =========================
-   GAME STATE
-========================= */
+//// GAME STATE
 let gameRunning = false;
 let paused = false;
 
-/* =========================
-   PLAYER
-========================= */
+//// PLAYER
 const player = {
-  x:0,
-  y:0,
+  x:0, y:0,
   size:18,
   speed:260,
   health:100,
@@ -37,134 +33,101 @@ const player = {
   invuln:0
 };
 
-/* =========================
-   CAMERA
-========================= */
-const camera = {
-  x:0,
-  y:0,
-  smooth:0.08
-};
+//// CAMERA
+const camera = { x:0, y:0, smooth:0.08 };
 
-/* =========================
-   INPUT
-========================= */
+//// INPUT
 const keys = {};
 window.addEventListener("keydown",e=>{
   keys[e.key]=true;
-
   if(e.key==="Escape") togglePause();
 });
 window.addEventListener("keyup",e=>keys[e.key]=false);
 
-/* =========================
-   JOYSTICK
-========================= */
+//// JOYSTICK
 const joystick = document.getElementById("joystick");
 const stick = document.getElementById("stick");
 
-let joyX=0, joyY=0;
-let dragging=false;
+let joyX=0, joyY=0, dragging=false;
 
-joystick.addEventListener("touchstart",()=>dragging=true);
+if(joystick){
+  joystick.addEventListener("touchstart",()=>dragging=true);
 
-window.addEventListener("touchend",()=>{
-  dragging=false;
-  joyX=joyY=0;
-  stick.style.left="45px";
-  stick.style.top="45px";
-});
+  window.addEventListener("touchend",()=>{
+    dragging=false;
+    joyX=joyY=0;
+    stick.style.left="45px";
+    stick.style.top="45px";
+  });
 
-window.addEventListener("touchmove",e=>{
-  if(!dragging) return;
+  window.addEventListener("touchmove",e=>{
+    if(!dragging) return;
 
-  const rect=joystick.getBoundingClientRect();
-  const t=e.touches[0];
+    const rect=joystick.getBoundingClientRect();
+    const t=e.touches[0];
 
-  let x=t.clientX-rect.left-70;
-  let y=t.clientY-rect.top-70;
+    let x=t.clientX-rect.left-70;
+    let y=t.clientY-rect.top-70;
 
-  const d=Math.hypot(x,y);
-  if(d>40){
-    x=x/d*40;
-    y=y/d*40;
-  }
+    const d=Math.hypot(x,y);
+    if(d>40){ x=x/d*40; y=y/d*40; }
 
-  joyX=x/40;
-  joyY=y/40;
+    joyX=x/40;
+    joyY=y/40;
 
-  stick.style.left=45+x+"px";
-  stick.style.top=45+y+"px";
-});
-
-/* =========================
-   MOBILE BUTTONS
-========================= */
-const shootBtn = document.getElementById("shootBtn");
-
-if (shootBtn) {
-  shootBtn.ontouchstart = () => attackInput.shoot = true;
-  shootBtn.ontouchend   = () => attackInput.shoot = false;
+    stick.style.left=45+x+"px";
+    stick.style.top=45+y+"px";
+  });
 }
 
-/* =========================
-   MENU BUTTONS
-========================= */
-document.getElementById("playBtn").onclick=()=>{
-  document.getElementById("mainMenu").classList.add("hidden");
-  gameRunning=true;
-};
+//// ATTACK INPUT
+const attackInput = { shoot:false };
 
-document.getElementById("settingsBtn").onclick=()=>{
-  document.getElementById("settingsMenu").classList.remove("hidden");
-};
+//// MOBILE SHOOT BUTTON (TEK TANIM)
+const shootBtn = document.getElementById("shootBtn");
+if (shootBtn){
+  shootBtn.ontouchstart = ()=> attackInput.shoot=true;
+  shootBtn.ontouchend   = ()=> attackInput.shoot=false;
+}
 
-document.getElementById("backBtn").onclick=()=>{
-  document.getElementById("settingsMenu").classList.add("hidden");
-};
+//// MENU BUTTONS
+const playBtn = document.getElementById("playBtn");
+if(playBtn){
+  playBtn.onclick=()=>{
+    document.getElementById("mainMenu").classList.add("hidden");
+    gameRunning=true;
+  };
+}
 
-/* =========================
-   PAUSE
-========================= */
+//// PAUSE
 function togglePause(){
   paused=!paused;
-  document.getElementById("pauseOverlay")
-  .classList.toggle("hidden");
+  const el=document.getElementById("pauseOverlay");
+  if(el) el.classList.toggle("hidden");
 }
 
-/* =========================
-   ATTACK SYSTEM
-========================= */
-const attackInput={
-  shoot:false
-};
-
+//// BULLETS
 const bullets=[];
 
 function shoot(){
   bullets.push({
     x:player.x,
     y:player.y,
-    vx:Math.cos(0)*520,
-    vy:Math.sin(0)*520,
+    vx:520,
+    vy:0,
     r:4
   });
 }
 
-/* =========================
-   DASH
-========================= */
+//// DASH
 function performDash(){
   if(player.dashCooldown>0) return;
-
   player.x += player.dashPower;
   player.invuln=0.25;
   player.dashCooldown=1.2;
 }
 
-/* =========================
-   UPDATE
-========================= */
+//// UPDATE
 function update(dt){
 
   if(player.invuln>0) player.invuln-=dt;
@@ -181,10 +144,7 @@ function update(dt){
   dy+=joyY;
 
   const len=Math.hypot(dx,dy);
-  if(len>0){
-    dx/=len;
-    dy/=len;
-  }
+  if(len>0){ dx/=len; dy/=len; }
 
   player.x+=dx*player.speed*dt;
   player.y+=dy*player.speed*dt;
@@ -201,21 +161,11 @@ function update(dt){
     b.x+=b.vx*dt;
     b.y+=b.vy*dt;
   });
-
-  updateHUD();
-  updateMinimap();
 }
 
-window.update = update;
-window.draw = draw;
-
-/* =========================
-   DRAW GRID WORLD
-========================= */
+//// DRAW GRID
 function drawWorld(){
-
   const size=60;
-
   ctx.strokeStyle="#00ffaa22";
 
   const startX=Math.floor((camera.x-canvas.width/2)/size)*size;
@@ -236,11 +186,8 @@ function drawWorld(){
   }
 }
 
-/* =========================
-   DRAW
-========================= */
+//// DRAW
 function draw(){
-
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   ctx.save();
@@ -252,7 +199,6 @@ function draw(){
   ctx.shadowBlur=25;
   ctx.shadowColor="#00ffff";
   ctx.fillStyle="#00ffff";
-
   ctx.beginPath();
   ctx.arc(player.x,player.y,player.size,0,Math.PI*2);
   ctx.fill();
@@ -268,48 +214,9 @@ function draw(){
   ctx.restore();
 }
 
-/* =========================
-   HUD UPDATE
-========================= */
-function updateHUD(){
-
-  const hpRatio=player.health/player.maxHealth;
-  document.querySelector("#healthBar span")
-  .style.width=(hpRatio*100)+"%";
-
-  const xpRatio=player.xp/player.xpToNext;
-  document.querySelector("#xpBar span")
-  .style.width=(xpRatio*100)+"%";
-
-  document.getElementById("levelText")
-  .innerText="LV "+player.level;
-}
-
-/* =========================
-   MINIMAP
-========================= */
-const miniCanvas=document.getElementById("minimapCanvas");
-const miniCtx=miniCanvas.getContext("2d");
-
-function updateMinimap(){
-
-  miniCanvas.width=120;
-  miniCanvas.height=120;
-
-  miniCtx.fillStyle="#000";
-  miniCtx.fillRect(0,0,120,120);
-
-  miniCtx.fillStyle="#0ff";
-  miniCtx.fillRect(60,60,4,4);
-}
-
-/* =========================
-   GAME LOOP
-========================= */
+//// GAME LOOP
 let lastTime=0;
-
 function gameLoop(time){
-
   const dt=(time-lastTime)/1000;
   lastTime=time;
 
@@ -320,15 +227,11 @@ function gameLoop(time){
 
   requestAnimationFrame(gameLoop);
 }
-
 requestAnimationFrame(gameLoop);
 
-/* =========================
-   LOADING SCREEN HIDE
-========================= */
-window.onload=()=>{
-  document.getElementById("loadingScreen")
-  .style.display="none";
-};
+//// GLOBAL (systems.js için)
+window.player = player;
+window.update = update;
+window.draw = draw;
 
 });
