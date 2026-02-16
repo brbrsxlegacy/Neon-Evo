@@ -164,8 +164,9 @@ const firebaseConfig = {
   measurementId: "G-HD8901B19M"
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getDatabase(firebaseApp);
+const appFirebase = initializeApp(firebaseConfig);
+const db = getDatabase(appFirebase);
+
 
 window.firebaseDB = db;
 window.firebaseAppReady = true;
