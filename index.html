@@ -1714,11 +1714,6 @@ lbHeader.onclick = () => {
     document.getElementById("lbToggle").textContent = "⬆";
   }
 };
-
-
-  firebaseApp = initializeApp(firebaseConfig);
-  firebaseDB = getDatabase(firebaseApp);
-  window.firebaseAppReady = true;
   
   let playerName = localStorage.getItem("playerName");
   if (!playerName) {
@@ -1737,9 +1732,8 @@ lbHeader.onclick = () => {
 
   setInterval(submitScore, 30000);
 
-  onValue(ref(database, "leaderboard"), snapshot => {
+  onValue(ref(db, "leaderboard"), snapshot => {
     if(!window.firebaseDB) return;
-    const db = firebaseDB;
 
 
     const data = snapshot.val();
