@@ -1,62 +1,67 @@
 /* =========================
-   CANVAS & CONTEXT
+   CANVAS SETUP
 ========================= */
-
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 function resize(){
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
 window.addEventListener("resize", resize);
 resize();
 
-
 /* =========================
-   WORLD & CAMERA
+   GAME STATE
 ========================= */
-
-const camera = {
-  x: 0,
-  y: 0
-};
-
-function updateCamera(){
-  camera.x = player.x - canvas.width/2;
-  camera.y = player.y - canvas.height/2;
-}
-
+let gameRunning = false;
+let paused = false;
 
 /* =========================
    PLAYER
 ========================= */
-
 const player = {
-  x: 0,
-  y: 0,
-  size: 18,
-  speed: 260,
-  dashPower: 160,
-  dashCD: 0,
-  color: "#00ffff"
+  x:0,
+  y:0,
+  size:18,
+  speed:260,
+  health:100,
+  maxHealth:100,
+  level:1,
+  xp:0,
+  xpToNext:100,
+  dashCooldown:0,
+  dashPower:160,
+  invuln:0
 };
 
+/* =========================
+   CAMERA
+========================= */
+const camera = {
+  x:0,
+  y:0,
+  smooth:0.08
+};
 
 /* =========================
-   INPUT SYSTEM
+   INPUT
 ========================= */
-
 const keys = {};
-window.addEventListener("keydown", e=>keys[e.key]=true);
-window.addEventListener("keyup", e=>keys[e.key]=false);
+window.addEventListener("keydown",e=>{
+  keys[e.key]=true;
 
+  if(e.key==="Escape") togglePause();
+});
+window.addEventListener("keyup",e=>keys[e.key]=false);
 
-/* ===== MOBILE JOYSTICK ===== */
-
-let joyX=0, joyY=0;
+/* =========================
+   JOYSTICK
+========================= */
 const joystick = document.getElementById("joystick");
 const stick = document.getElementById("stick");
+
+let joyX=0, joyY=0;
 let dragging=false;
 
 joystick.addEventListener("touchstart",()=>dragging=true);
@@ -71,76 +76,105 @@ window.addEventListener("touchend",()=>{
 window.addEventListener("touchmove",e=>{
   if(!dragging) return;
 
-  const rect = joystick.getBoundingClientRect();
-  const touch = e.touches[0];
+  const rect=joystick.getBoundingClientRect();
+  const t=e.touches[0];
 
-  let x = touch.clientX - rect.left - 70;
-  let y = touch.clientY - rect.top - 70;
+  let x=t.clientX-rect.left-70;
+  let y=t.clientY-rect.top-70;
 
-  const dist = Math.hypot(x,y);
-  if(dist>40){
-    x=x/dist*40;
-    y=y/dist*40;
+  const d=Math.hypot(x,y);
+  if(d>40){
+    x=x/d*40;
+    y=y/d*40;
   }
 
   joyX=x/40;
   joyY=y/40;
 
-  stick.style.left = 45 + x + "px";
-  stick.style.top  = 45 + y + "px";
+  stick.style.left=45+x+"px";
+  stick.style.top=45+y+"px";
 });
-
 
 /* =========================
-   ACTION BUTTONS
+   MOBILE BUTTONS
 ========================= */
+document.getElementById("shootBtn").ontouchstart=()=>attackInput.shoot=true;
+document.getElementById("shootBtn").ontouchend=()=>attackInput.shoot=false;
 
-let meleePressed=false;
-let dashPressed=false;
-
-document.getElementById("meleeBtn").ontouchstart=()=>meleePressed=true;
-document.getElementById("meleeBtn").ontouchend=()=>meleePressed=false;
-
-document.getElementById("dashBtn").ontouchstart=()=>dashPressed=true;
-document.getElementById("dashBtn").ontouchend=()=>dashPressed=false;
-
-window.addEventListener("keydown",e=>{
-  if(e.code==="Space") meleePressed=true;
-  if(e.key==="Shift") dashPressed=true;
-});
-
-window.addEventListener("keyup",e=>{
-  if(e.code==="Space") meleePressed=false;
-  if(e.key==="Shift") dashPressed=false;
-});
-
+document.getElementById("dashBtn").ontouchstart=()=>performDash();
 
 /* =========================
-   BIOME SYSTEM
+   MENU BUTTONS
 ========================= */
+document.getElementById("playBtn").onclick=()=>{
+  document.getElementById("mainMenu").classList.add("hidden");
+  gameRunning=true;
+};
 
-function getBiome(x){
-  if(x > 900) return "fire";
-  if(x < -900) return "ice";
-  return "forest";
+document.getElementById("settingsBtn").onclick=()=>{
+  document.getElementById("settingsMenu").classList.remove("hidden");
+};
+
+document.getElementById("backBtn").onclick=()=>{
+  document.getElementById("settingsMenu").classList.add("hidden");
+};
+
+/* =========================
+   PAUSE
+========================= */
+function togglePause(){
+  paused=!paused;
+  document.getElementById("pauseOverlay")
+  .classList.toggle("hidden");
 }
 
+/* =========================
+   ATTACK SYSTEM
+========================= */
+const attackInput={
+  shoot:false
+};
+
+const bullets=[];
+
+function shoot(){
+  bullets.push({
+    x:player.x,
+    y:player.y,
+    vx:Math.cos(0)*520,
+    vy:Math.sin(0)*520,
+    r:4
+  });
+}
 
 /* =========================
-   PLAYER UPDATE
+   DASH
 ========================= */
+function performDash(){
+  if(player.dashCooldown>0) return;
 
-function updatePlayer(dt){
+  player.x += player.dashPower;
+  player.invuln=0.25;
+  player.dashCooldown=1.2;
+}
+
+/* =========================
+   UPDATE
+========================= */
+function update(dt){
+
+  if(player.invuln>0) player.invuln-=dt;
+  if(player.dashCooldown>0) player.dashCooldown-=dt;
 
   let dx=0, dy=0;
 
-  if(keys["w"]||keys["ArrowUp"]) dy--;
-  if(keys["s"]||keys["ArrowDown"]) dy++;
-  if(keys["a"]||keys["ArrowLeft"]) dx--;
-  if(keys["d"]||keys["ArrowRight"]) dx++;
+  if(keys["w"]||keys["ArrowUp"]) dy-=1;
+  if(keys["s"]||keys["ArrowDown"]) dy+=1;
+  if(keys["a"]||keys["ArrowLeft"]) dx-=1;
+  if(keys["d"]||keys["ArrowRight"]) dx+=1;
 
-  dx += joyX;
-  dy += joyY;
+  dx+=joyX;
+  dy+=joyY;
 
   const len=Math.hypot(dx,dy);
   if(len>0){
@@ -148,110 +182,145 @@ function updatePlayer(dt){
     dy/=len;
   }
 
-  player.x += dx * player.speed * dt;
-  player.y += dy * player.speed * dt;
+  player.x+=dx*player.speed*dt;
+  player.y+=dy*player.speed*dt;
 
-  /* DASH */
-  if(dashPressed && player.dashCD<=0){
-    player.x += dx * player.dashPower;
-    player.y += dy * player.dashPower;
-    player.dashCD = 1;
+  camera.x += (player.x-camera.x)*camera.smooth;
+  camera.y += (player.y-camera.y)*camera.smooth;
+
+  if(attackInput.shoot){
+    shoot();
+    attackInput.shoot=false;
   }
 
-  if(player.dashCD>0) player.dashCD -= dt;
+  bullets.forEach(b=>{
+    b.x+=b.vx*dt;
+    b.y+=b.vy*dt;
+  });
+
+  updateHUD();
+  updateMinimap();
 }
 
-
 /* =========================
-   WORLD DRAW
+   DRAW GRID WORLD
 ========================= */
-
 function drawWorld(){
 
-  const biome = getBiome(player.x);
+  const size=60;
 
-  let bg;
-
-  if(biome==="fire"){
-    bg = ctx.createRadialGradient(0,0,200,0,0,1600);
-    bg.addColorStop(0,"#2a1208");
-    bg.addColorStop(1,"#090201");
-  }
-  else if(biome==="ice"){
-    bg = ctx.createRadialGradient(0,0,200,0,0,1600);
-    bg.addColorStop(0,"#0b1e2f");
-    bg.addColorStop(1,"#02060c");
-  }
-  else{
-    bg = ctx.createRadialGradient(0,0,200,0,0,1600);
-    bg.addColorStop(0,"#071a14");
-    bg.addColorStop(1,"#010403");
-  }
-
-  ctx.fillStyle=bg;
-  ctx.fillRect(camera.x-1200,camera.y-1200,2400,2400);
-
-  /* grid */
   ctx.strokeStyle="#00ffaa22";
-  const grid=60;
 
-  for(let x=-2000;x<2000;x+=grid){
+  const startX=Math.floor((camera.x-canvas.width/2)/size)*size;
+  const startY=Math.floor((camera.y-canvas.height/2)/size)*size;
+
+  for(let x=startX;x<startX+canvas.width+size;x+=size){
     ctx.beginPath();
-    ctx.moveTo(x,-2000);
-    ctx.lineTo(x,2000);
+    ctx.moveTo(x,startY);
+    ctx.lineTo(x,startY+canvas.height+size);
     ctx.stroke();
   }
 
-  for(let y=-2000;y<2000;y+=grid){
+  for(let y=startY;y<startY+canvas.height+size;y+=size){
     ctx.beginPath();
-    ctx.moveTo(-2000,y);
-    ctx.lineTo(2000,y);
+    ctx.moveTo(startX,y);
+    ctx.lineTo(startX+canvas.width+size,y);
     ctx.stroke();
   }
 }
 
-
 /* =========================
-   PLAYER DRAW
+   DRAW
 ========================= */
+function draw(){
 
-function drawPlayer(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(canvas.width/2-camera.x,
+                canvas.height/2-camera.y);
+
+  drawWorld();
+
   ctx.shadowBlur=25;
-  ctx.shadowColor=player.color;
-  ctx.fillStyle=player.color;
+  ctx.shadowColor="#00ffff";
+  ctx.fillStyle="#00ffff";
 
   ctx.beginPath();
   ctx.arc(player.x,player.y,player.size,0,Math.PI*2);
   ctx.fill();
+
+  ctx.shadowBlur=0;
+  ctx.fillStyle="#6cf";
+  bullets.forEach(b=>{
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.restore();
 }
 
+/* =========================
+   HUD UPDATE
+========================= */
+function updateHUD(){
+
+  const hpRatio=player.health/player.maxHealth;
+  document.querySelector("#healthBar span")
+  .style.width=(hpRatio*100)+"%";
+
+  const xpRatio=player.xp/player.xpToNext;
+  document.querySelector("#xpBar span")
+  .style.width=(xpRatio*100)+"%";
+
+  document.getElementById("levelText")
+  .innerText="LV "+player.level;
+}
+
+/* =========================
+   MINIMAP
+========================= */
+const miniCanvas=document.getElementById("minimapCanvas");
+const miniCtx=miniCanvas.getContext("2d");
+
+function updateMinimap(){
+
+  miniCanvas.width=120;
+  miniCanvas.height=120;
+
+  miniCtx.fillStyle="#000";
+  miniCtx.fillRect(0,0,120,120);
+
+  miniCtx.fillStyle="#0ff";
+  miniCtx.fillRect(60,60,4,4);
+}
 
 /* =========================
    GAME LOOP
 ========================= */
+let lastTime=0;
 
-let last=0;
+function gameLoop(time){
 
-function loop(t){
+  const dt=(time-lastTime)/1000;
+  lastTime=time;
 
-  const dt=(t-last)/1000;
-  last=t;
+  if(gameRunning && !paused){
+    update(dt);
+    draw();
+  }
 
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  updatePlayer(dt);
-  updateCamera();
-
-  ctx.save();
-  ctx.translate(-camera.x,-camera.y);
-
-  drawWorld();
-  drawPlayer();
-
-  ctx.restore();
-
-  requestAnimationFrame(loop);
+  requestAnimationFrame(gameLoop);
 }
 
-requestAnimationFrame(loop);
+requestAnimationFrame(gameLoop);
+
+/* =========================
+   LOADING SCREEN HIDE
+========================= */
+window.onload=()=>{
+  document.getElementById("loadingScreen")
+  .style.display="none";
+};
 
