@@ -3,141 +3,159 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport"
-content="width=device-width, initial-scale=1.0, user-scalable=no">
+content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>NEON RISE</title>
 
-<title>Neon Rise</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:,">
 
-<style>
-/* ===== RESET ===== */
-html,body{
-  margin:0;
-  padding:0;
-  overflow:hidden;
-  background:#05060a;
-  font-family:system-ui;
-}
+<!-- PERFORMANCE -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="dns-prefetch" href="//fonts.googleapis.com">
 
-/* ===== CANVAS ===== */
-canvas{
-  display:block;
-  background: radial-gradient(circle at center,#0b1020,#02030a);
-}
-
-/* ===== MAIN MENU ===== */
-#menu{
-  position:fixed;
-  inset:0;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-  gap:18px;
-  background:linear-gradient(#02030a,#000);
-  z-index:5;
-}
-
-#menu h1{
-  color:#00ffff;
-  font-size:48px;
-  text-shadow:0 0 25px #00ffff;
-}
-
-.menuBtn{
-  width:220px;
-  padding:14px;
-  font-size:18px;
-  background:#111;
-  color:white;
-  border:2px solid #00ffff;
-  cursor:pointer;
-}
-
-.menuBtn:hover{
-  background:#00ffff;
-  color:black;
-}
-
-/* ===== MOBILE JOYSTICK ===== */
-#joystick{
-  position:fixed;
-  left:20px;
-  bottom:20px;
-  width:140px;
-  height:140px;
-  border-radius:50%;
-  background:rgba(0,255,255,.08);
-  border:2px solid rgba(0,255,255,.4);
-}
-
-#stick{
-  position:absolute;
-  left:45px;
-  top:45px;
-  width:50px;
-  height:50px;
-  border-radius:50%;
-  background:rgba(0,255,255,.9);
-}
-
-/* ===== MOBILE ATTACK BUTTONS ===== */
-#actions{
-  position:fixed;
-  right:20px;
-  bottom:20px;
-  display:flex;
-  gap:12px;
-}
-
-.actionBtn{
-  width:64px;
-  height:64px;
-  border-radius:50%;
-  border:2px solid rgba(0,255,255,.6);
-  background:rgba(0,255,255,.15);
-  color:white;
-  font-size:12px;
-}
-</style>
 </head>
-
 <body>
 
-<!-- ===== MENU ===== -->
-<div id="menu">
-  <h1>NEON RISE</h1>
-  <button class="menuBtn" onclick="startGame()">PLAY</button>
-  <button class="menuBtn" onclick="toggleInfo()">INFO</button>
+<!-- =========================
+     LOADING SCREEN
+========================= -->
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <p>Loading Neon Core...</p>
 </div>
 
-<!-- ===== CANVAS ===== -->
+<!-- =========================
+     CANVAS
+========================= -->
 <canvas id="game"></canvas>
 
-<!-- ===== JOYSTICK ===== -->
+<!-- =========================
+     MAIN MENU
+========================= -->
+<div id="mainMenu" class="panel">
+  <h1>NEON RISE</h1>
+
+  <button id="playBtn">PLAY</button>
+  <button id="settingsBtn">SETTINGS</button>
+  <button id="shopBtn">SHOP</button>
+</div>
+
+<!-- =========================
+     SETTINGS MENU
+========================= -->
+<div id="settingsMenu" class="panel hidden">
+  <h2>SETTINGS</h2>
+
+  <label>
+    <input type="checkbox" id="musicToggle" checked>
+    Music
+  </label>
+
+  <label>
+    <input type="checkbox" id="sfxToggle" checked>
+    Sound Effects
+  </label>
+
+  <label>
+    Volume
+    <input type="range" id="volumeSlider"
+           min="0" max="1" step="0.05" value="0.6">
+  </label>
+
+  <button id="backBtn">BACK</button>
+</div>
+
+<!-- =========================
+     SHOP PANEL
+========================= -->
+<div id="shopPanel" class="panel hidden">
+  <h2>SHOP</h2>
+  <div id="shopItems"></div>
+  <button class="closeBtn">CLOSE</button>
+</div>
+
+<!-- =========================
+     QUEST PANEL
+========================= -->
+<div id="questPanel">
+  <h3>QUESTS</h3>
+  <ul id="questList"></ul>
+</div>
+
+<!-- =========================
+     LEADERBOARD PANEL
+========================= -->
+<div id="leaderboard">
+  <h3>TOP PLAYERS</h3>
+  <div id="leaderboardContent"></div>
+</div>
+
+<!-- =========================
+     NOTIFICATION TOAST
+========================= -->
+<div id="toast"></div>
+
+<!-- =========================
+     HUD
+========================= -->
+<div id="hud">
+
+  <div id="healthBar">
+    <span></span>
+  </div>
+
+  <div id="xpBar">
+    <span></span>
+  </div>
+
+  <div id="levelText">LV 1</div>
+
+</div>
+
+<!-- =========================
+     MINIMAP
+========================= -->
+<div id="minimap">
+  <canvas id="minimapCanvas"></canvas>
+</div>
+
+<!-- =========================
+     MOBILE JOYSTICK
+========================= -->
 <div id="joystick">
   <div id="stick"></div>
 </div>
 
-<!-- ===== ACTION BUTTONS ===== -->
-<div id="actions">
-  <button class="actionBtn" id="meleeBtn">MELEE</button>
-  <button class="actionBtn" id="dashBtn">DASH</button>
+<!-- =========================
+     MOBILE ACTION BUTTONS
+========================= -->
+<div id="mobileButtons">
+  <button id="shootBtn">SHOT</button>
+  <button id="dashBtn">DASH</button>
 </div>
 
-<script>
-/* ===== MENU ===== */
-function startGame(){
-  document.getElementById("menu").style.display="none";
-}
+<!-- =========================
+     PAUSE OVERLAY
+========================= -->
+<div id="pauseOverlay" class="hidden">
+  <h2>PAUSED</h2>
+  <button id="resumeBtn">RESUME</button>
+  <button id="exitBtn">EXIT</button>
+</div>
 
-function toggleInfo(){
-  alert("Neon Rise\nHayatta kal, güçlen ve bossları yen!");
-}
-</script>
+<!-- =========================
+     ACCESSIBILITY
+========================= -->
+<div class="sr-only">
+  Neon Rise Game Interface
+</div>
 
-<!-- GAME FILES -->
-<script src="game.js"></script>
+<!-- =========================
+     SCRIPTS
+========================= -->
 <script src="systems.js"></script>
+<script src="game.js"></script>
 
 </body>
 </html>
-
