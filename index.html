@@ -77,6 +77,33 @@ canvas {
   color:#000;
 }
 
+
+#settingsMenu{
+  position:fixed;
+  inset:0;
+  background:#000;
+  color:#0ff;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:16px;
+  z-index:11;
+}
+
+#shopMenu{
+  position:fixed;
+  inset:0;
+  background:#000;
+  color:#0ff;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:14px;
+  z-index:11;
+}
+
 </style>
 </head>
 
@@ -86,9 +113,27 @@ canvas {
 <div id="mainMenu">
   <h1>NEON RISE</h1>
   <button onclick="startGame()">PLAY</button>
+  <button onclick="openShop()">SHOP</button>
   <button onclick="openSettings()">SETTINGS</button>
-  <button onclick="alert('Yakında 😎')">ONLINE</button>
 </div>
+
+<div id="settingsMenu" style="display:none;">
+  <h2>SETTINGS</h2>
+  <label>
+    <input type="checkbox" id="sfxToggle" checked>
+    Sound Effects
+  </label><br><br>
+  <label>
+    <input type="checkbox" id="musicToggle" checked>
+    Music
+  </label><br><br>
+  <label>
+    Volume
+    <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.6">
+  </label><br><br>
+  <button onclick="closeSettings()">BACK</button>
+</div>
+
 
 <div id="joystick">
   <div id="stick"></div>
@@ -106,6 +151,11 @@ let myPlayerId = localStorage.getItem("playerName") ||
 
 window.playerId = myPlayerId;
 
+<div id="shopMenu" style="display:none;">
+  <h2>SHOP</h2>
+  <div id="shopItems"></div>
+  <button onclick="closeShop()">BACK</button>
+</div>
 
 /* =========================
    CANVAS & GAME LOOP
@@ -416,8 +466,32 @@ draw = function() {
   gameRunning = true;
 }
 
-  function openSettings(){
-  alert("Ayarlar yakında 😎");
+function openSettings(){
+  document.getElementById("mainMenu").style.display="none";
+  document.getElementById("settingsMenu").style.display="flex";
+}
+
+function closeSettings(){
+  document.getElementById("settingsMenu").style.display="none";
+  document.getElementById("mainMenu").style.display="flex";
+}
+
+window.addEventListener("keydown", e => {
+  if(e.key === "Escape"){
+    gameRunning = false;
+    document.getElementById("mainMenu").style.display="flex";
+  }
+});
+
+function openShop(){
+  document.getElementById("mainMenu").style.display="none";
+  document.getElementById("shopMenu").style.display="flex";
+  renderShopAdvanced();
+}
+
+function closeShop(){
+  document.getElementById("shopMenu").style.display="none";
+  document.getElementById("mainMenu").style.display="flex";
 }
 
 /* =========================
@@ -1041,10 +1115,14 @@ levelUp = function(){
 const shopBtn = document.createElement("button");
 shopBtn.textContent = "SHOP";
 shopBtn.style.cssText = `
-  position:fixed; top:12px; right:12px;
-  background:#0ff2; color:#eaf2ff;
+  position:fixed;
+  bottom:90px;
+  right:20px;
+  background:#0ff2;
+  color:#fff;
   border:1px solid #0ff;
   padding:6px 10px;
+  z-index:9;
 `;
 document.body.appendChild(shopBtn);
 
@@ -1451,7 +1529,6 @@ function stopMusic(){
 window.addEventListener("pointerdown", startMusic, { once:true });
 
 // ---- AYAR MENÜSÜ ----
-const settingsBtn = document.createElement("button");
 settingsBtn.textContent = "SETTINGS";
 settingsBtn.style.cssText = `
   position:fixed; top:12px; left:12px;
@@ -2252,6 +2329,22 @@ draw = function(){
   ctx.fillText(tag + myPlayerId, player.x-20, player.y-25);
 
   ctx.restore();
+};
+
+
+document.getElementById("sfxToggle").onchange = e=>{
+  soundSettings.sfx = e.target.checked;
+};
+
+document.getElementById("musicToggle").onchange = e=>{
+  soundSettings.music = e.target.checked;
+  if(soundSettings.music) tryStartMusic();
+  else bgMusic.pause();
+};
+
+document.getElementById("volumeSlider").oninput = e=>{
+  soundSettings.volume = parseFloat(e.target.value);
+  bgMusic.volume = 0.4 * soundSettings.volume;
 };
 
 </script>
