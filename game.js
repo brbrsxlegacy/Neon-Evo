@@ -107,13 +107,6 @@ if (shootBtn) {
   shootBtn.ontouchend   = () => attackInput.shoot = false;
 }
 
-const shootBtn = document.getElementById("shootBtn");
-
-if (shootBtn) {
-  shootBtn.ontouchstart = () => attackInput.shoot = true;
-  shootBtn.ontouchend   = () => attackInput.shoot = false;
-}
-
 /* =========================
    MENU BUTTONS
 ========================= */
@@ -212,6 +205,9 @@ function update(dt){
   updateHUD();
   updateMinimap();
 }
+
+window.update = update;
+window.draw = draw;
 
 /* =========================
    DRAW GRID WORLD
