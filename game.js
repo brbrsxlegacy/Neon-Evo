@@ -1,14 +1,5 @@
 window.addEventListener("DOMContentLoaded", () => {
 
-  const shootBtn = document.getElementById("shootBtn");
-
-  if (shootBtn) {
-    shootBtn.ontouchstart = () => attackInput.shoot = true;
-    shootBtn.ontouchend   = () => attackInput.shoot = false;
-  }
-
-});
-
 /* =========================
    CANVAS SETUP
 ========================= */
@@ -344,3 +335,4 @@ window.onload=()=>{
   .style.display="none";
 };
 
+});
