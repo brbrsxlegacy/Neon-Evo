@@ -1,1 +1,143 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+<title>Neon Rise</title>
+
+<style>
+/* ===== RESET ===== */
+html,body{
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  background:#05060a;
+  font-family:system-ui;
+}
+
+/* ===== CANVAS ===== */
+canvas{
+  display:block;
+  background: radial-gradient(circle at center,#0b1020,#02030a);
+}
+
+/* ===== MAIN MENU ===== */
+#menu{
+  position:fixed;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:18px;
+  background:linear-gradient(#02030a,#000);
+  z-index:5;
+}
+
+#menu h1{
+  color:#00ffff;
+  font-size:48px;
+  text-shadow:0 0 25px #00ffff;
+}
+
+.menuBtn{
+  width:220px;
+  padding:14px;
+  font-size:18px;
+  background:#111;
+  color:white;
+  border:2px solid #00ffff;
+  cursor:pointer;
+}
+
+.menuBtn:hover{
+  background:#00ffff;
+  color:black;
+}
+
+/* ===== MOBILE JOYSTICK ===== */
+#joystick{
+  position:fixed;
+  left:20px;
+  bottom:20px;
+  width:140px;
+  height:140px;
+  border-radius:50%;
+  background:rgba(0,255,255,.08);
+  border:2px solid rgba(0,255,255,.4);
+}
+
+#stick{
+  position:absolute;
+  left:45px;
+  top:45px;
+  width:50px;
+  height:50px;
+  border-radius:50%;
+  background:rgba(0,255,255,.9);
+}
+
+/* ===== MOBILE ATTACK BUTTONS ===== */
+#actions{
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  display:flex;
+  gap:12px;
+}
+
+.actionBtn{
+  width:64px;
+  height:64px;
+  border-radius:50%;
+  border:2px solid rgba(0,255,255,.6);
+  background:rgba(0,255,255,.15);
+  color:white;
+  font-size:12px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- ===== MENU ===== -->
+<div id="menu">
+  <h1>NEON RISE</h1>
+  <button class="menuBtn" onclick="startGame()">PLAY</button>
+  <button class="menuBtn" onclick="toggleInfo()">INFO</button>
+</div>
+
+<!-- ===== CANVAS ===== -->
+<canvas id="game"></canvas>
+
+<!-- ===== JOYSTICK ===== -->
+<div id="joystick">
+  <div id="stick"></div>
+</div>
+
+<!-- ===== ACTION BUTTONS ===== -->
+<div id="actions">
+  <button class="actionBtn" id="meleeBtn">MELEE</button>
+  <button class="actionBtn" id="dashBtn">DASH</button>
+</div>
+
+<script>
+/* ===== MENU ===== */
+function startGame(){
+  document.getElementById("menu").style.display="none";
+}
+
+function toggleInfo(){
+  alert("Neon Rise\nHayatta kal, güçlen ve bossları yen!");
+}
+</script>
+
+<!-- GAME FILES -->
+<script src="game.js"></script>
+<script src="systems.js"></script>
+
+</body>
+</html>
 
