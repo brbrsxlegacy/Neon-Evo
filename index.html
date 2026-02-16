@@ -2,48 +2,43 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
+
 <meta name="viewport"
-content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#000000">
-<title>NEON RISE</title>
+content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<meta name="theme-color" content="#000">
+<meta name="color-scheme" content="dark">
+
+<title>Neon Rise</title>
 
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:,">
 
-<!-- PERFORMANCE -->
+<!-- Performance -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="dns-prefetch" href="//fonts.googleapis.com">
 
 </head>
 <body>
 
-<!-- =========================
-     LOADING SCREEN
-========================= -->
-<div id="loadingScreen">
+<!-- LOADING -->
+<div id="loadingScreen" class="center">
   <div class="spinner"></div>
   <p>Loading Neon Core...</p>
 </div>
 
-<!-- =========================
-     CANVAS
-========================= -->
+<!-- GAME CANVAS -->
 <canvas id="game"></canvas>
 
-<!-- =========================
-     MAIN MENU
-========================= -->
+<!-- MAIN MENU -->
 <div id="mainMenu" class="panel">
   <h1>NEON RISE</h1>
-
   <button id="playBtn">PLAY</button>
   <button id="settingsBtn">SETTINGS</button>
   <button id="shopBtn">SHOP</button>
 </div>
 
-<!-- =========================
-     SETTINGS MENU
-========================= -->
+<!-- SETTINGS -->
 <div id="settingsMenu" class="panel hidden">
   <h2>SETTINGS</h2>
 
@@ -59,104 +54,55 @@ content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=c
 
   <label>
     Volume
-    <input type="range" id="volumeSlider"
-           min="0" max="1" step="0.05" value="0.6">
+    <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.6">
   </label>
 
   <button id="backBtn">BACK</button>
 </div>
 
-<!-- =========================
-     SHOP PANEL
-========================= -->
+<!-- SHOP -->
 <div id="shopPanel" class="panel hidden">
   <h2>SHOP</h2>
   <div id="shopItems"></div>
   <button class="closeBtn">CLOSE</button>
 </div>
 
-<!-- =========================
-     QUEST PANEL
-========================= -->
-<div id="questPanel">
-  <h3>QUESTS</h3>
-  <ul id="questList"></ul>
-</div>
-
-<!-- =========================
-     LEADERBOARD PANEL
-========================= -->
-<div id="leaderboard">
-  <h3>TOP PLAYERS</h3>
-  <div id="leaderboardContent"></div>
-</div>
-
-<!-- =========================
-     NOTIFICATION TOAST
-========================= -->
-<div id="toast"></div>
-
-<!-- =========================
-     HUD
-========================= -->
+<!-- HUD -->
 <div id="hud">
-
-  <div id="healthBar">
-    <span></span>
-  </div>
-
-  <div id="xpBar">
-    <span></span>
-  </div>
-
+  <div id="healthBar"><span></span></div>
+  <div id="xpBar"><span></span></div>
   <div id="levelText">LV 1</div>
-
 </div>
 
-<!-- =========================
-     MINIMAP
-========================= -->
+<!-- MINIMAP -->
 <div id="minimap">
   <canvas id="minimapCanvas"></canvas>
 </div>
 
-<!-- =========================
-     MOBILE JOYSTICK
-========================= -->
+<!-- JOYSTICK -->
 <div id="joystick">
   <div id="stick"></div>
 </div>
 
-<!-- =========================
-     MOBILE ACTION BUTTONS
-========================= -->
+<!-- MOBILE BUTTONS -->
 <div id="mobileButtons">
   <button id="shootBtn">SHOT</button>
   <button id="dashBtn">DASH</button>
 </div>
 
-<!-- =========================
-     PAUSE OVERLAY
-========================= -->
+<!-- PAUSE -->
 <div id="pauseOverlay" class="hidden">
   <h2>PAUSED</h2>
   <button id="resumeBtn">RESUME</button>
   <button id="exitBtn">EXIT</button>
 </div>
 
-<!-- =========================
-     ACCESSIBILITY
-========================= -->
-<div class="sr-only">
-  Neon Rise Game Interface
-</div>
+<!-- TOAST -->
+<div id="toast"></div>
 
-<!-- =========================
-     SCRIPTS
-========================= -->
-<script src="game.js"></script>
-<script src="systems.js"></script>
-
+<!-- JS (professional order) -->
+<script src="game.js" defer></script>
+<script src="systems.js" defer></script>
 
 </body>
 </html>
