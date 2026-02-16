@@ -1,3 +1,4 @@
+window.addEventListener("DOMContentLoaded", () => {
 /* =========================
    CANVAS SETUP
 ========================= */
@@ -324,3 +325,4 @@ window.onload=()=>{
   .style.display="none";
 };
 
+});
