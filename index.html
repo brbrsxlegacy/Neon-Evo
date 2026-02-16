@@ -147,6 +147,10 @@ canvas {
 </div>
 
 <script>
+
+let firebaseApp = null;
+let firebaseDB = null;
+
 window.firebaseAppReady = false;
 
 let gameRunning = false;
@@ -1701,26 +1705,10 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
   const { initializeApp, getApp } = appModule;
   const { getDatabase, ref, set, onValue } = dbModule;
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
-    authDomain: "pixelroom-ae218.firebaseapp.com",
-    databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "pixelroom-ae218",
-    storageBucket: "pixelroom-ae218.firebasestorage.app",
-    messagingSenderId: "720297722320",
-    appId: "1:720297722320:web:c815edae99d1efa7ff39d5"
-  };
-
-  let app;
-  try {
-    app = initializeApp(firebaseConfig);
-  } catch(e) {
-    app = getApp();
-  }
+  firebaseApp = initializeApp(firebaseConfig);
+  firebaseDB = getDatabase(firebaseApp);
   window.firebaseAppReady = true;
-
-  const database = getDatabase(app);
-
+  
   let playerName = localStorage.getItem("playerName");
   if (!playerName) {
     playerName = prompt("İsmini gir:");
@@ -1779,7 +1767,7 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(d
 const { getDatabase, ref, runTransaction } = dbModule;
 
 if(!window.firebaseAppReady) return;
-const db = getDatabase(getApp());
+const db = firebaseDB;
 if (!window.playerId) return;
 const ROOM = "world1";
 
@@ -1952,7 +1940,7 @@ wardrobeBtn.onclick = toggleWardrobe;
 import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
 
 const { getDatabase, ref, set, get, remove, onDisconnect, onValue } = dbModule;
-const db = getDatabase(getApp());
+const db = firebaseDB;
 
 let currentRoom = null;
 let myPlayerRef = null;
@@ -2079,8 +2067,8 @@ update = function(dt){
 
 import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
 
-const { getDatabase, ref, push, onValue } = dbModule;
-const db = getDatabase(getApp());
+const { getDatabase, ref, push, onValue } = dbModule;const db = firebaseDB;
+
 
 let chatRoom = null;
 
@@ -2231,7 +2219,7 @@ update = function(dt){
 import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
 
 const { getDatabase, ref, set, get, update } = dbModule;
-const db = getDatabase(getApp());
+const db = firebaseDB;
 
 player.clan = null;
 
