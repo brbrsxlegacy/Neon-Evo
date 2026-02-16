@@ -95,6 +95,8 @@ canvas {
 </div>
 
 <script>
+window.firebaseAppReady = false;
+
 let gameRunning = false;
 const WORLD_SPAWN = { x: 0, y: 0 };
 const remotePlayers = {};
@@ -1331,6 +1333,7 @@ function loadGame() {
 // Otomatik yükle
 loadGame();
 
+  
 // Otomatik kaydet (30 sn)
 setInterval(saveGame, 30000);
 
@@ -1634,6 +1637,7 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
   } catch(e) {
     app = getApp();
   }
+  window.firebaseAppReady = true;
 
   const database = getDatabase(app);
 
@@ -1694,6 +1698,7 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(d
 
 const { getDatabase, ref, runTransaction } = dbModule;
 
+if(!window.firebaseAppReady) return;
 const db = getDatabase();
 if (!window.playerId) return;
 const ROOM = "world1";
