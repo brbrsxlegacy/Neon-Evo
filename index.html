@@ -122,6 +122,8 @@ canvas {
   <button onclick="startGame()">PLAY</button>
   <button onclick="openShop()">SHOP</button>
   <button onclick="openSettings()">SETTINGS</button>
+  <button id="createRoomBtn">CREATE ROOM</button>
+  <button id="joinRoomBtn">JOIN ROOM</button>
 </div>
 
 <div id="settingsMenu" style="display:none;">
@@ -146,7 +148,28 @@ canvas {
   <div id="stick"></div>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, get, remove, onDisconnect, push, runTransaction } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyABqkhpL1SMRzRJ9GQLjjZE2IryqpAvMPw",
+  authDomain: "pixelroom-ae218.firebaseapp.com",
+  databaseURL: "https://pixelroom-ae218-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "pixelroom-ae218",
+  storageBucket: "pixelroom-ae218.firebasestorage.app",
+  messagingSenderId: "720297722320",
+  appId: "1:720297722320:web:c815edae99d1efa7ff39d5",
+  measurementId: "G-HD8901B19M"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getDatabase(firebaseApp);
+
+window.firebaseDB = db;
+window.firebaseAppReady = true;
+
 
 let firebaseApp = null;
 let firebaseDB = null;
@@ -1695,12 +1718,6 @@ lbHeader.onclick = () => {
     document.getElementById("lbToggle").textContent = "⬆";
   }
 };
-  
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js")
-.then(appModule => {
-
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
-.then(dbModule => {
 
   const { initializeApp, getApp } = appModule;
   const { getDatabase, ref, set, onValue } = dbModule;
@@ -1764,8 +1781,6 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
 /* =========================
    PVP SYSTEM (SECURE TRANSACTION)
 ========================= */
-
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule => {
 
 const { getDatabase, ref, runTransaction } = dbModule;
 
@@ -1940,8 +1955,6 @@ wardrobeBtn.onclick = toggleWardrobe;
    MAIN MENU ROOM SYSTEM + RESPAWN
 ========================= */
 
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
-
 const { getDatabase, ref, set, get, remove, onDisconnect, onValue } = dbModule;
 const db = firebaseDB;
 
@@ -2068,8 +2081,6 @@ update = function(dt){
    ROOM CHAT SYSTEM
 ========================= */
 
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
-
 const { getDatabase, ref, push, onValue } = dbModule;const db = firebaseDB;
 
 
@@ -2151,11 +2162,12 @@ update = function(dt){
 };
 
 // Respawn sırasında kalkan ver
-if (typeof joinRoom === "function"){
-  const _respawnFix = joinRoom;
+if (typeof joinRoom === "function") {
+  const _joinRoomChat = joinRoom;
   joinRoom = function(roomName){
-    _respawnFix(roomName);
-    player.spawnShield = 3;
+    _joinRoomChat(roomName);
+    chatRoom = roomName;
+    attachChat(roomName);
   };
 }
 /* =========================
@@ -2218,9 +2230,6 @@ update = function(dt){
 /* =========================
    CLAN SYSTEM
 ========================= */
-
-import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
-
 const { getDatabase, ref, set, get, update } = dbModule;
 const db = firebaseDB;
 
