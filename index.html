@@ -21,13 +21,6 @@ canvas {
   background: radial-gradient(circle at center, #0b1020, #02030a);
 }
 
-<div id="mainMenu">
-  <h1>NEON RISE</h1>
-  <button onclick="startGame()">PLAY</button>
-  <button onclick="openSettings()">SETTINGS</button>
-  <button onclick="alert('Yakında 😎')">ONLINE</button>
-</div>
-
 /* Mobil joystick */
 #joystick {
   position: fixed;
@@ -89,6 +82,13 @@ canvas {
 
 <body>
 <canvas id="game"></canvas>
+
+<div id="mainMenu">
+  <h1>NEON RISE</h1>
+  <button onclick="startGame()">PLAY</button>
+  <button onclick="openSettings()">SETTINGS</button>
+  <button onclick="alert('Yakında 😎')">ONLINE</button>
+</div>
 
 <div id="joystick">
   <div id="stick"></div>
@@ -212,19 +212,18 @@ player.dash = {
 
 player.quests = [];
 
-
-function getBiome(x,y){
-  if(x > 900) return "fire";
-  if(x < -900) return "ice";
-  return "forest";
-}
-  
   if(player.slowTimer > 0){
     player.slowTimer -= dt;
     player.speed = 140;
   }else{
     player.speed = 260;
   }
+
+function getBiome(x,y){
+  if(x > 900) return "fire";
+  if(x < -900) return "ice";
+  return "forest";
+}
 
 /* =========================
    DRAW
@@ -255,24 +254,13 @@ function draw() {
   }
   
   ctx.fillStyle = bg;
-  ctx.fillRect(-4000, -4000, 8000, 8000);
+ ctx.fillRect(player.x-1200, player.y-1200, 2400, 2400);
 
   
   ctx.strokeStyle = biome === "fire" ? "#ff330055" :
                   biome === "ice" ? "#66ccff55" :
                   "#00ffaa33";
   ctx.lineWidth = 1;
-
-
-  function startGame(){
-  document.getElementById("mainMenu").style.display="none";
-  gameRunning = true;
-}
-
-  function openSettings(){
-  alert("Ayarlar yakında 😎");
-}
-
 
   // Grid
   const gridSize = 60;
@@ -422,6 +410,16 @@ draw = function() {
 
   ctx.restore();
 };
+
+  function startGame(){
+  document.getElementById("mainMenu").style.display="none";
+  gameRunning = true;
+}
+
+  function openSettings(){
+  alert("Ayarlar yakında 😎");
+}
+
 /* =========================
    HEALTH & COLLISION SYSTEM
 ========================= */
@@ -1331,7 +1329,7 @@ function loadGame() {
 }
 
 // Otomatik yükle
-setTimeout(loadGame, 0);
+window.addEventListener("load", loadGame);
 
   
 // Otomatik kaydet (30 sn)
@@ -1770,7 +1768,7 @@ function spawnMiniBoss(){
 }
 
 setInterval(()=>{
-  if (player.level > 0 && player.level % 10 === 0){
+  if (player.level > 0 && player.level % 10 === 0 && enemies.filter(e=>e.type==="boss").length===0){
     spawnMiniBoss();
   }
 }, 15000);
@@ -1873,7 +1871,7 @@ wardrobeBtn.onclick = toggleWardrobe;
 import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
 
 const { getDatabase, ref, set, get, remove, onDisconnect, onValue } = dbModule;
-const db = getDatabase();
+const db = getDatabase(window.firebaseApp);
 
 let currentRoom = null;
 let myPlayerRef = null;
