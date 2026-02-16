@@ -1716,7 +1716,7 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
   }
 
   function submitScore() {
-    set(ref(database, "leaderboard/" + playerName), {
+    onValue(ref(db, "leaderboard"), snapshot => {
       level: player.level,
       coins: player.coins,
       timestamp: Date.now()
@@ -1726,6 +1726,9 @@ import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js")
   setInterval(submitScore, 30000);
 
   onValue(ref(database, "leaderboard"), snapshot => {
+    if(!window.firebaseDB) return;
+    const db = firebaseDB;
+
 
     const data = snapshot.val();
     if (!data) return;
