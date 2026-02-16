@@ -21,6 +21,13 @@ canvas {
   background: radial-gradient(circle at center, #0b1020, #02030a);
 }
 
+<div id="mainMenu">
+  <h1>NEON RISE</h1>
+  <button onclick="startGame()">PLAY</button>
+  <button onclick="openSettings()">SETTINGS</button>
+  <button onclick="alert('Yakında 😎')">ONLINE</button>
+</div>
+
 /* Mobil joystick */
 #joystick {
   position: fixed;
@@ -42,6 +49,41 @@ canvas {
   border-radius: 50%;
   background: rgba(0,255,255,0.9);
 }
+
+#mainMenu{
+  position:fixed;
+  inset:0;
+  background:linear-gradient(#02030a,#000);
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:20px;
+  z-index:10;
+}
+
+#mainMenu h1{
+  font-size:48px;
+  color:#00ffff;
+  text-shadow:0 0 20px #00ffff;
+}
+
+#mainMenu button{
+  width:220px;
+  padding:14px;
+  font-size:18px;
+  border:none;
+  background:#111;
+  color:#fff;
+  border:2px solid #00ffff;
+  cursor:pointer;
+}
+
+#mainMenu button:hover{
+  background:#00ffff;
+  color:#000;
+}
+
 </style>
 </head>
 
@@ -53,6 +95,7 @@ canvas {
 </div>
 
 <script>
+let gameRunning = false;
 const WORLD_SPAWN = { x: 0, y: 0 };
 const remotePlayers = {};
 
@@ -79,8 +122,10 @@ let lastTime = 0;
 function gameLoop(time) {
   const delta = (time - lastTime) / 1000;
   lastTime = time;
+  if(gameRunning){
   update(delta);
   draw();
+}
   requestAnimationFrame(gameLoop);
 }
 requestAnimationFrame(gameLoop);
@@ -215,6 +260,17 @@ function draw() {
                   biome === "ice" ? "#66ccff55" :
                   "#00ffaa33";
   ctx.lineWidth = 1;
+
+
+  function startGame(){
+  document.getElementById("mainMenu").style.display="none";
+  gameRunning = true;
+}
+
+  function openSettings(){
+  alert("Ayarlar yakında 😎");
+}
+
 
   // Grid
   const gridSize = 60;
