@@ -260,14 +260,14 @@ player.dash = {
 };
 
 player.quests = [];
-
-
+  
+  // slow effect
   if(player.slowTimer > 0){
-      player.slowTimer -= dt;
-      player.speed = 140;
-    }else{
-      player.speed = 260;
-    }
+    player.slowTimer -= dt;
+    player.speed = 140;
+  } else {
+    player.speed = 260;
+  }
 
 function getBiome(x,y){
   if(x > 900) return "fire";
@@ -1290,7 +1290,7 @@ function renderShopAdvanced() {
     player.auraRadius += 4;
   } else {
     // inventory Set olduğu için duplicate olmaz
-    player.inventory.add(it.id);
+   player.inventory.push(it.id);
   }
 
   renderShopAdvanced();
@@ -1849,7 +1849,7 @@ function spawnMiniBoss(){
 }
 
 setInterval(()=>{
-  if (player.level > 0 && player.level % 10 === 0 && enemies.filter(e=>e.type==="boss").length===0){
+  if (player.level > 0 && player.level % 10 === 0 && enemies.filter(e=>e.type===ENEMY_TYPES.BOSS).length===0){
     spawnMiniBoss();
   }
 }, 15000);
@@ -1952,7 +1952,7 @@ wardrobeBtn.onclick = toggleWardrobe;
 import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(dbModule=>{
 
 const { getDatabase, ref, set, get, remove, onDisconnect, onValue } = dbModule;
-const db = getDatabase(window.firebaseApp);
+const db = getDatabase(getApp());
 
 let currentRoom = null;
 let myPlayerRef = null;
@@ -1960,22 +1960,6 @@ let myPlayerId = localStorage.getItem("playerName") ||
                  "p_"+Math.random().toString(36).substr(2,9);
 
 localStorage.setItem("playerName", myPlayerId);
-
-/* ---------- ANA MENÜ ---------- */
-
-const mainMenu = document.createElement("div");
-mainMenu.innerHTML = `
-  <h1>NEON RISE ONLINE</h1>
-  <button id="createRoomBtn">ODA OLUŞTUR</button>
-  <button id="joinRoomBtn">ODAYA GİR</button>
-`;
-
-mainMenu.innerHTML = `
-  <h1>NEON RISE ONLINE</h1>
-  <button id="createRoomBtn">ODA OLUŞTUR</button>
-  <button id="joinRoomBtn">ODAYA GİR</button>
-`;
-document.body.appendChild(mainMenu);
 
 /* ---------- ODA OLUŞTUR ---------- */
 
