@@ -99,10 +99,19 @@ window.addEventListener("touchmove",e=>{
 /* =========================
    MOBILE BUTTONS
 ========================= */
-document.getElementById("shootBtn").ontouchstart=()=>attackInput.shoot=true;
-document.getElementById("shootBtn").ontouchend=()=>attackInput.shoot=false;
+const shootBtn = document.getElementById("shootBtn");
 
-document.getElementById("dashBtn").ontouchstart=()=>performDash();
+if (shootBtn) {
+  shootBtn.ontouchstart = () => attackInput.shoot = true;
+  shootBtn.ontouchend   = () => attackInput.shoot = false;
+}
+
+const shootBtn = document.getElementById("shootBtn");
+
+if (shootBtn) {
+  shootBtn.ontouchstart = () => attackInput.shoot = true;
+  shootBtn.ontouchend   = () => attackInput.shoot = false;
+}
 
 /* =========================
    MENU BUTTONS
