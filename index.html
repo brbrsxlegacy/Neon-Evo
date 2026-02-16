@@ -1733,12 +1733,13 @@ lbHeader.onclick = () => {
   }
 
   function submitScore() {
-    onValue(ref(db, "leaderboard"), snapshot => {
-      level: player.level,
-      coins: player.coins,
-      timestamp: Date.now()
-    });
-  }
+  set(ref(db, "leaderboard/" + playerName), {
+    level: player.level,
+    coins: player.coins,
+    timestamp: Date.now()
+  });
+}
+
 
   setInterval(submitScore, 30000);
 
