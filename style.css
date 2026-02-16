@@ -1,1 +1,280 @@
+/* =========================
+   GLOBAL RESET
+========================= */
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+html,body{
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  font-family:system-ui,Segoe UI,Roboto,Arial;
+  background:#000;
+  color:#eaf2ff;
+}
+
+/* =========================
+   CANVAS
+========================= */
+canvas{
+  display:block;
+  background: radial-gradient(circle at center,#0b1020,#02030a);
+}
+
+/* =========================
+   LOADING SCREEN
+========================= */
+#loadingScreen{
+  position:fixed;
+  inset:0;
+  background:#000;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  z-index:999;
+}
+
+.spinner{
+  width:60px;
+  height:60px;
+  border-radius:50%;
+  border:5px solid rgba(0,255,255,.2);
+  border-top:5px solid #00ffff;
+  animation:spin 1s linear infinite;
+  margin-bottom:20px;
+}
+
+@keyframes spin{
+  to{ transform:rotate(360deg); }
+}
+
+/* =========================
+   PANELS
+========================= */
+.panel{
+  position:fixed;
+  inset:0;
+  background:linear-gradient(#02030a,#000);
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:16px;
+  z-index:10;
+}
+
+.panel h1{
+  font-size:48px;
+  color:#00ffff;
+  text-shadow:0 0 20px #00ffff;
+}
+
+.panel button{
+  width:220px;
+  padding:14px;
+  font-size:18px;
+  border:2px solid #00ffff;
+  background:#111;
+  color:#fff;
+  cursor:pointer;
+  transition:.25s;
+}
+
+.panel button:hover{
+  background:#00ffff;
+  color:#000;
+  box-shadow:0 0 20px #00ffff;
+}
+
+.hidden{ display:none; }
+
+/* =========================
+   HUD
+========================= */
+#hud{
+  position:fixed;
+  top:14px;
+  left:14px;
+  width:220px;
+  z-index:5;
+}
+
+#healthBar,
+#xpBar{
+  width:100%;
+  height:14px;
+  background:rgba(255,255,255,.1);
+  margin-bottom:6px;
+  border-radius:8px;
+  overflow:hidden;
+}
+
+#healthBar span{
+  display:block;
+  height:100%;
+  width:100%;
+  background:#00ff99;
+  box-shadow:0 0 12px #00ff99;
+}
+
+#xpBar span{
+  display:block;
+  height:100%;
+  width:0%;
+  background:#6cf;
+  box-shadow:0 0 12px #6cf;
+}
+
+#levelText{
+  font-size:14px;
+  color:#6cf;
+}
+
+/* =========================
+   QUEST PANEL
+========================= */
+#questPanel{
+  position:fixed;
+  left:14px;
+  bottom:14px;
+  width:200px;
+  background:#000;
+  border:1px solid #0ff;
+  padding:10px;
+  font-size:12px;
+}
+
+/* =========================
+   LEADERBOARD
+========================= */
+#leaderboard{
+  position:fixed;
+  right:14px;
+  bottom:14px;
+  width:220px;
+  max-height:260px;
+  overflow:auto;
+  background:#000;
+  border:1px solid #0ff;
+  padding:10px;
+  font-size:12px;
+}
+
+/* =========================
+   MINIMAP
+========================= */
+#minimap{
+  position:fixed;
+  top:14px;
+  right:14px;
+  width:120px;
+  height:120px;
+  border:1px solid #0ff;
+  background:#000;
+}
+
+#minimap canvas{
+  width:100%;
+  height:100%;
+}
+
+/* =========================
+   TOAST
+========================= */
+#toast{
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#000;
+  color:#0ff;
+  padding:8px 14px;
+  border:1px solid #0ff;
+  border-radius:8px;
+  box-shadow:0 0 12px #0ff;
+  opacity:0;
+  transition:.25s;
+}
+
+/* =========================
+   MOBILE JOYSTICK
+========================= */
+#joystick{
+  position:fixed;
+  left:20px;
+  bottom:20px;
+  width:140px;
+  height:140px;
+  border-radius:50%;
+  background:rgba(0,255,255,.08);
+  border:2px solid rgba(0,255,255,.4);
+}
+
+#stick{
+  position:absolute;
+  left:45px;
+  top:45px;
+  width:50px;
+  height:50px;
+  border-radius:50%;
+  background:rgba(0,255,255,.9);
+}
+
+/* =========================
+   MOBILE BUTTONS
+========================= */
+#mobileButtons{
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  display:flex;
+  gap:12px;
+}
+
+#mobileButtons button{
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  border:2px solid #0ff;
+  background:rgba(0,255,255,.1);
+  color:#eaf2ff;
+  font-size:12px;
+}
+
+/* =========================
+   PAUSE OVERLAY
+========================= */
+#pauseOverlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.8);
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:16px;
+  z-index:20;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width:768px){
+
+  #hud{ width:180px; }
+
+  .panel h1{ font-size:36px; }
+
+  #mobileButtons button{
+    width:60px;
+    height:60px;
+  }
+
+}
 
