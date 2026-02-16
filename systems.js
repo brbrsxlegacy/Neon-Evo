@@ -1,3 +1,5 @@
+"use strict";
+
 /* =========================
    BIOME SYSTEM
 ========================= */
@@ -18,6 +20,7 @@ const ENEMY_TYPES = {
 };
 
 const enemies=[];
+const particles=[];
 
 /* =========================
    SPAWN ENEMIES
@@ -50,8 +53,6 @@ function spawnEnemy(){
 /* =========================
    PARTICLES
 ========================= */
-const particles=[];
-
 function spawnParticles(x,y,color,count=8){
   for(let i=0;i<count;i++){
     particles.push({
@@ -68,10 +69,7 @@ function spawnParticles(x,y,color,count=8){
 /* =========================
    SCREEN SHAKE
 ========================= */
-const screenShake={
-  time:0,
-  power:6
-};
+const screenShake={ time:0, power:6 };
 
 /* =========================
    ENEMY UPDATE
@@ -84,27 +82,26 @@ function updateEnemies(dt){
     spawnTimer=1.4;
   }
 
+  let slowed=false;
+
   enemies.forEach(e=>{
 
     const dx=player.x-e.x;
     const dy=player.y-e.y;
     const dist=Math.hypot(dx,dy)||1;
 
-    // melee takip
     if(e.type===ENEMY_TYPES.MELEE){
-      e.x += (dx/dist)*e.speed*dt;
-      e.y += (dy/dist)*e.speed*dt;
+      e.x+=(dx/dist)*e.speed*dt;
+      e.y+=(dy/dist)*e.speed*dt;
     }
 
-    // ranged mesafe korur
     if(e.type===ENEMY_TYPES.RANGED){
       if(dist>220){
-        e.x += (dx/dist)*e.speed*dt;
-        e.y += (dy/dist)*e.speed*dt;
+        e.x+=(dx/dist)*e.speed*dt;
+        e.y+=(dy/dist)*e.speed*dt;
       }
     }
 
-    // FIRE ENEMY
     if(e.type===ENEMY_TYPES.FIRE){
       e.cooldown-=dt;
       if(e.cooldown<=0){
@@ -114,20 +111,19 @@ function updateEnemies(dt){
       }
     }
 
-    // ICE ENEMY
-    if(e.type===ENEMY_TYPES.ICE){
-      if(dist<120){
-        player.speed=140;
-        spawnParticles(player.x,player.y,"#66ccff",2);
-      }
+    if(e.type===ENEMY_TYPES.ICE && dist<120){
+      slowed=true;
+      spawnParticles(player.x,player.y,"#66ccff",2);
     }
 
   });
 
+  // slow reset fix
+  player.speed = slowed ? 140 : 260;
 }
 
 /* =========================
-   COLLISION
+   COLLISION & DAMAGE
 ========================= */
 function hitCheck(ax,ay,ar,bx,by,br){
   const dx=ax-bx;
@@ -135,9 +131,6 @@ function hitCheck(ax,ay,ar,bx,by,br){
   return Math.hypot(dx,dy)<ar+br;
 }
 
-/* =========================
-   DAMAGE & XP
-========================= */
 function damageEnemies(dt){
 
   for(let i=enemies.length-1;i>=0;i--){
@@ -147,7 +140,6 @@ function damageEnemies(dt){
       e.hp-=30*dt;
 
       if(e.hp<=0){
-
         spawnParticles(e.x,e.y,"#0ff",12);
         screenShake.time=0.15;
 
@@ -179,85 +171,23 @@ function levelUp(){
    PARTICLE UPDATE
 ========================= */
 function updateParticles(dt){
-
   for(let i=particles.length-1;i>=0;i--){
     const p=particles[i];
-
     p.life-=dt;
     p.x+=p.vx*dt;
     p.y+=p.vy*dt;
     p.vx*=0.95;
     p.vy*=0.95;
-
     if(p.life<=0) particles.splice(i,1);
   }
-
 }
 
 /* =========================
-   DRAW ENEMIES
-========================= */
-function drawEnemies(ctx){
-
-  enemies.forEach(e=>{
-    ctx.shadowBlur=20;
-
-    if(e.type===ENEMY_TYPES.FIRE){
-      ctx.fillStyle="#ff5500";
-      ctx.shadowColor="#ff5500";
-    }
-    else if(e.type===ENEMY_TYPES.ICE){
-      ctx.fillStyle="#66ccff";
-      ctx.shadowColor="#66ccff";
-    }
-    else{
-      ctx.fillStyle="#ff3355";
-      ctx.shadowColor="#ff3355";
-    }
-
-    ctx.beginPath();
-    ctx.arc(e.x,e.y,e.size,0,Math.PI*2);
-    ctx.fill();
-  });
-
-}
-
-/* =========================
-   DRAW PARTICLES
-========================= */
-function drawParticles(ctx){
-
-  particles.forEach(p=>{
-    ctx.globalAlpha=p.life;
-    ctx.fillStyle=p.color;
-    ctx.beginPath();
-    ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
-    ctx.fill();
-  });
-
-  ctx.globalAlpha=1;
-}
-
-/* =========================
-   SCREEN SHAKE APPLY
-========================= */
-function applyScreenShake(ctx){
-
-  if(screenShake.time>0){
-    screenShake.time-=0.016;
-    const x=(Math.random()-0.5)*screenShake.power;
-    const y=(Math.random()-0.5)*screenShake.power;
-    ctx.translate(x,y);
-  }
-}
-
-/* =========================
-   BIOME BACKGROUND COLOR
+   DRAW SYSTEMS
 ========================= */
 function drawBiomeBackground(ctx){
 
   const biome=getBiome(player.x);
-
   let gradient;
 
   if(biome==="fire"){
@@ -280,33 +210,82 @@ function drawBiomeBackground(ctx){
   ctx.fillRect(player.x-1200,player.y-1200,2400,2400);
 }
 
-/* =========================
-   SYSTEM UPDATE HOOK
-========================= */
-const oldUpdate = update;
-update = function(dt){
-  oldUpdate(dt);
-  updateEnemies(dt);
-  damageEnemies(dt);
-  updateParticles(dt);
-};
+function drawEnemies(ctx){
+  enemies.forEach(e=>{
+    ctx.shadowBlur=20;
+
+    if(e.type===ENEMY_TYPES.FIRE){
+      ctx.fillStyle="#ff5500";
+      ctx.shadowColor="#ff5500";
+    }
+    else if(e.type===ENEMY_TYPES.ICE){
+      ctx.fillStyle="#66ccff";
+      ctx.shadowColor="#66ccff";
+    }
+    else{
+      ctx.fillStyle="#ff3355";
+      ctx.shadowColor="#ff3355";
+    }
+
+    ctx.beginPath();
+    ctx.arc(e.x,e.y,e.size,0,Math.PI*2);
+    ctx.fill();
+  });
+}
+
+function drawParticles(ctx){
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+    ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
 
 /* =========================
-   SYSTEM DRAW HOOK
+   SAFE HOOK SYSTEM
 ========================= */
-const oldDraw = draw;
-draw = function(){
 
-  ctx.save();
-  applyScreenShake(ctx);
-  oldDraw();
+if(window.update){
 
-  ctx.translate(canvas.width/2-camera.x,
-                canvas.height/2-camera.y);
+  const originalUpdate = window.update;
 
-  drawBiomeBackground(ctx);
-  drawEnemies(ctx);
-  drawParticles(ctx);
+  window.update = function(dt){
+    originalUpdate(dt);
+    updateEnemies(dt);
+    damageEnemies(dt);
+    updateParticles(dt);
+  };
 
-  ctx.restore();
-};
+}
+
+if(window.draw){
+
+  const originalDraw = window.draw;
+
+  window.draw = function(){
+
+    ctx.save();
+
+    if(screenShake.time>0){
+      screenShake.time -= 0.016;
+      const x=(Math.random()-0.5)*screenShake.power;
+      const y=(Math.random()-0.5)*screenShake.power;
+      ctx.translate(x,y);
+    }
+
+    originalDraw();
+
+    ctx.translate(canvas.width/2-camera.x,
+                  canvas.height/2-camera.y);
+
+    drawBiomeBackground(ctx);
+    drawEnemies(ctx);
+    drawParticles(ctx);
+
+    ctx.restore();
+  };
+
+}
