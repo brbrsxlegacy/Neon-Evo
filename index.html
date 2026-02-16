@@ -1765,67 +1765,6 @@ lbHeader.onclick = () => {
   });
 
 });
-});
-
-/* =========================
-   PVP SYSTEM (SECURE TRANSACTION)
-========================= */
-
-const { getDatabase, ref, runTransaction } = dbModule;
-
-if(!window.firebaseAppReady) return;
-const db = firebaseDB;
-if (!window.playerId) return;
-const ROOM = "world1";
-
-// PvP kontrol (melee alanında)
-function checkPvP() {
-  Object.entries(remotePlayers).forEach(([id, rp]) => {
-    const dist = Math.hypot(player.x - rp.x, player.y - rp.y);
-
-    if (dist < 40 && attackInput.melee) {
-      stealLevel(id);
-    }
-  });
-}
-
-// Güvenli level çalma
-function stealLevel(targetId) {
-  const targetRef = ref(db, "rooms/"+ROOM+"/players/"+targetId);
-
-  runTransaction(targetRef, currentData => {
-    if (currentData == null) return;
-
-    if (currentData.level > 1) {
-      const stolen = currentData.level;
-      currentData.level = 1;
-
-      // kazanana level ekle
-      player.level += stolen;
-
-      // kendi levelini DB'ye yaz
-      const myRef = ref(db, "rooms/"+ROOM+"/players/"+playerId);
-      runTransaction(myRef, myData => {
-        if (!myData) return;
-        myData.level = player.level;
-        return myData;
-      });
-
-      return currentData;
-    }
-
-    return currentData;
-  });
-}
-
-// Update zincirine bağla
-const _updatePvP = update;
-update = function(dt){
-  _updatePvP(dt);
-  checkPvP();
-};
-
-});
 
 /* =========================
    MINI BOSS SYSTEM
