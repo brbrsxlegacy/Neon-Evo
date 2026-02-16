@@ -1,98 +1,111 @@
+"use strict";
+
+/* =========================
+   CORE ENGINE
+========================= */
+
+const Engine = {
+  time: 0,
+  delta: 0,
+  running: true,
+  paused: false,
+  systems: []
+};
+
 /* =========================
    CANVAS
 ========================= */
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
-window.addEventListener("resize", resize);
+addEventListener("resize", resize);
 resize();
-
-/* =========================
-   GAME STATE
-========================= */
-let gameRunning = true;
-let paused = false;
 
 /* =========================
    PLAYER
 ========================= */
+
 const player = {
   x:0,
   y:0,
-  size:18,
+  r:18,
   speed:260,
-  health:100,
-  maxHealth:100,
-  level:1,
-  xp:0,
-  xpToNext:100
+  hp:100,
+  maxHp:100
 };
 
 /* =========================
    CAMERA
 ========================= */
-const camera = { x:0, y:0, smooth:0.08 };
+
+const camera = {
+  x:0,
+  y:0,
+  smooth:0.08
+};
 
 /* =========================
    INPUT
 ========================= */
+
 const keys = {};
-window.addEventListener("keydown",e=>{
+addEventListener("keydown", e=>{
   keys[e.key]=true;
-  if(e.key==="Escape") paused=!paused;
+  if(e.key==="Escape") Engine.paused=!Engine.paused;
 });
-window.addEventListener("keyup",e=>keys[e.key]=false);
+addEventListener("keyup", e=>keys[e.key]=false);
 
 /* =========================
-   JOYSTICK
+   JOYSTICK (SAFE MOBILE)
 ========================= */
+
+let joyX=0, joyY=0;
+
 const joystick=document.getElementById("joystick");
 const stick=document.getElementById("stick");
 
-let joyX=0, joyY=0, dragging=false;
-
 if(joystick){
- joystick.addEventListener("touchstart",()=>dragging=true);
 
- window.addEventListener("touchend",()=>{
-   dragging=false; joyX=joyY=0;
-   stick.style.left="45px";
-   stick.style.top="45px";
- });
+  let drag=false;
 
- window.addEventListener("touchmove",e=>{
-   if(!dragging) return;
-   const rect=joystick.getBoundingClientRect();
-   const t=e.touches[0];
+  joystick.ontouchstart=()=>drag=true;
 
-   let x=t.clientX-rect.left-70;
-   let y=t.clientY-rect.top-70;
-   const d=Math.hypot(x,y);
-   if(d>40){ x=x/d*40; y=y/d*40; }
+  addEventListener("touchend",()=>{
+    drag=false; joyX=joyY=0;
+    stick.style.left="45px";
+    stick.style.top="45px";
+  });
 
-   joyX=x/40;
-   joyY=y/40;
+  addEventListener("touchmove",e=>{
+    if(!drag) return;
 
-   stick.style.left=45+x+"px";
-   stick.style.top=45+y+"px";
- });
+    const rect=joystick.getBoundingClientRect();
+    const t=e.touches[0];
+
+    let x=t.clientX-rect.left-70;
+    let y=t.clientY-rect.top-70;
+
+    const d=Math.hypot(x,y);
+    if(d>40){ x=x/d*40; y=y/d*40; }
+
+    joyX=x/40;
+    joyY=y/40;
+
+    stick.style.left=45+x+"px";
+    stick.style.top=45+y+"px";
+  });
 }
 
 /* =========================
-   ATTACK
+   BULLETS
 ========================= */
-const attackInput={ shoot:false };
-const bullets=[];
 
-const shootBtn=document.getElementById("shootBtn");
-if(shootBtn){
-  shootBtn.ontouchstart=()=>attackInput.shoot=true;
-  shootBtn.ontouchend=()=>attackInput.shoot=false;
-}
+const bullets=[];
 
 function shoot(){
   bullets.push({
@@ -100,73 +113,55 @@ function shoot(){
     y:player.y,
     vx:520,
     vy:0,
-    r:4
+    life:2
   });
 }
 
+const shootBtn=document.getElementById("shootBtn");
+if(shootBtn){
+  shootBtn.ontouchstart=shoot;
+}
+
 /* =========================
-   UPDATE
+   CORE UPDATE
 ========================= */
+
 function update(dt){
 
   let dx=0, dy=0;
 
-  if(keys["w"]||keys["ArrowUp"]) dy-=1;
-  if(keys["s"]||keys["ArrowDown"]) dy+=1;
-  if(keys["a"]||keys["ArrowLeft"]) dx-=1;
-  if(keys["d"]||keys["ArrowRight"]) dx+=1;
+  if(keys.w||keys.ArrowUp) dy--;
+  if(keys.s||keys.ArrowDown) dy++;
+  if(keys.a||keys.ArrowLeft) dx--;
+  if(keys.d||keys.ArrowRight) dx++;
 
   dx+=joyX;
   dy+=joyY;
 
   const len=Math.hypot(dx,dy);
-  if(len>0){ dx/=len; dy/=len; }
+  if(len){ dx/=len; dy/=len; }
 
   player.x+=dx*player.speed*dt;
   player.y+=dy*player.speed*dt;
 
-  camera.x+=(player.x-camera.x)*camera.smooth;
-  camera.y+=(player.y-camera.y)*camera.smooth;
-
-  if(attackInput.shoot){
-    shoot();
-    attackInput.shoot=false;
-  }
+  camera.x += (player.x-camera.x)*camera.smooth;
+  camera.y += (player.y-camera.y)*camera.smooth;
 
   bullets.forEach(b=>{
     b.x+=b.vx*dt;
     b.y+=b.vy*dt;
+    b.life-=dt;
   });
-}
 
-/* =========================
-   DRAW WORLD GRID
-========================= */
-function drawWorld(){
-  const size=60;
-  ctx.strokeStyle="#00ffaa22";
-
-  const startX=Math.floor((camera.x-canvas.width/2)/size)*size;
-  const startY=Math.floor((camera.y-canvas.height/2)/size)*size;
-
-  for(let x=startX;x<startX+canvas.width+size;x+=size){
-    ctx.beginPath();
-    ctx.moveTo(x,startY);
-    ctx.lineTo(x,startY+canvas.height+size);
-    ctx.stroke();
-  }
-
-  for(let y=startY;y<startY+canvas.height+size;y+=size){
-    ctx.beginPath();
-    ctx.moveTo(startX,y);
-    ctx.lineTo(startX+canvas.width+size,y);
-    ctx.stroke();
+  for(let i=bullets.length-1;i>=0;i--){
+    if(bullets[i].life<=0) bullets.splice(i,1);
   }
 }
 
 /* =========================
-   DRAW
+   DRAW PIPELINE
 ========================= */
+
 function draw(){
 
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -175,14 +170,14 @@ function draw(){
   ctx.translate(canvas.width/2-camera.x,
                 canvas.height/2-camera.y);
 
-  drawWorld();
+  drawGrid();
 
   ctx.shadowBlur=25;
   ctx.shadowColor="#00ffff";
   ctx.fillStyle="#00ffff";
 
   ctx.beginPath();
-  ctx.arc(player.x,player.y,player.size,0,Math.PI*2);
+  ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
   ctx.fill();
 
   ctx.shadowBlur=0;
@@ -190,7 +185,7 @@ function draw(){
 
   bullets.forEach(b=>{
     ctx.beginPath();
-    ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+    ctx.arc(b.x,b.y,4,0,Math.PI*2);
     ctx.fill();
   });
 
@@ -198,28 +193,70 @@ function draw(){
 }
 
 /* =========================
-   GAME LOOP
+   GRID
 ========================= */
-let lastTime=0;
 
-function gameLoop(time){
-  const dt=(time-lastTime)/1000;
-  lastTime=time;
+function drawGrid(){
+  const s=60;
+  ctx.strokeStyle="#00ffaa22";
 
-  if(!paused){
-    update(dt);
-    draw();
+  const startX=Math.floor((camera.x-canvas.width/2)/s)*s;
+  const startY=Math.floor((camera.y-canvas.height/2)/s)*s;
+
+  for(let x=startX;x<startX+canvas.width+s;x+=s){
+    ctx.beginPath();
+    ctx.moveTo(x,startY);
+    ctx.lineTo(x,startY+canvas.height+s);
+    ctx.stroke();
   }
 
-  requestAnimationFrame(gameLoop);
+  for(let y=startY;y<startY+canvas.height+s;y+=s){
+    ctx.beginPath();
+    ctx.moveTo(startX,y);
+    ctx.lineTo(startX+canvas.width+s,y);
+    ctx.stroke();
+  }
 }
-requestAnimationFrame(gameLoop);
 
 /* =========================
-   GLOBAL EXPORT (CRITICAL)
+   SYSTEM BUS
 ========================= */
-window.update = update;
-window.draw = draw;
+
+Engine.addSystem = sys => Engine.systems.push(sys);
+
+/* =========================
+   MAIN LOOP
+========================= */
+
+function loop(t){
+
+  Engine.delta = Math.min((t-Engine.time)/1000, 0.033);
+  Engine.time = t;
+
+  if(!Engine.paused){
+    update(Engine.delta);
+
+    Engine.systems.forEach(s=>{
+      if(s.update) s.update(Engine.delta);
+    });
+
+    draw();
+
+    Engine.systems.forEach(s=>{
+      if(s.draw) s.draw(ctx);
+    });
+  }
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+
+/* =========================
+   GLOBAL EXPORT
+========================= */
+
+window.Engine = Engine;
 window.player = player;
 window.ctx = ctx;
 window.canvas = canvas;
